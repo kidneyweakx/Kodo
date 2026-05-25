@@ -6,7 +6,7 @@
  *
  *  AGPL-3.0-or-later. See LICENSE, NOTICE.md.
  */
-package gg.solidarity.miband9active.xiaomi.activity
+package com.kidneyweakx.miband9active.xiaomi.activity
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder

@@ -4,7 +4,7 @@
  *  This file is part of mi-band-9-active and ported from Gadgetbridge.
  *  AGPL-3.0-or-later. See LICENSE, NOTICE.md.
  */
-package gg.solidarity.miband9active.xiaomi
+package com.kidneyweakx.miband9active.xiaomi
 
 /**
  * Mi Band 9 Active workout type code → semantic kind.

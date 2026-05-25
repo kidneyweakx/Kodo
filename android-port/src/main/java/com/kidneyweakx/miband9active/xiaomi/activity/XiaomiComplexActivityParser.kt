@@ -2,7 +2,7 @@
  *  Copyright (C) 2026 kidneyweakx            (Kotlin port)
  *  AGPL-3.0-or-later.
  */
-package gg.solidarity.miband9active.xiaomi.activity
+package com.kidneyweakx.miband9active.xiaomi.activity
 
 import java.nio.ByteBuffer
 

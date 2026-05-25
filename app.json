@@ -6,6 +6,7 @@
     "platforms": ["android"],
     "orientation": "portrait",
     "scheme": "miband9active",
+    "owner": "kidneyweakx",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "icon": "./assets/icon.png",
@@ -15,7 +16,7 @@
       "backgroundColor": "#0A0A0B"
     },
     "android": {
-      "package": "gg.solidarity.miband9active",
+      "package": "com.kidneyweakx.miband9active",
       "permissions": [
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",

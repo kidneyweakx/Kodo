@@ -5,7 +5,7 @@
  *  XiaomiActivitySample minus the GreenDAO/Device/User bookkeeping fields —
  *  our persistence layer is MMKV/Room, not GreenDAO.
  */
-package gg.solidarity.miband9active.xiaomi.activity
+package com.kidneyweakx.miband9active.xiaomi.activity
 
 const val NOT_MEASURED: Int = Int.MIN_VALUE
 

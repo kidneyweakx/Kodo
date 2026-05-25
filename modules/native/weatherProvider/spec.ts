@@ -9,7 +9,7 @@
  *   - LineageOsWeatherReceiver, CMWeatherReceiver (alternative sources)
  *
  * The Kotlin side registers a BroadcastReceiver listening on
- * "gg.solidarity.miband9active.ACTION_GENERIC_WEATHER" and parses the same
+ * "com.kidneyweakx.miband9active.ACTION_GENERIC_WEATHER" and parses the same
  * payload shape Gadgetbridge ships (so existing weather apps can target us).
  *
  * For users without a weather app, we also expose a simple OWM polling

@@ -5,7 +5,7 @@
  *  Translated from SleepStagesParser.java. Returns a pure data result; the
  *  caller persists into our MMKV/Room layer.
  */
-package gg.solidarity.miband9active.xiaomi.activity
+package com.kidneyweakx.miband9active.xiaomi.activity
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder

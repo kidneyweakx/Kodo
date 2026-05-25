@@ -148,7 +148,7 @@ Mi Band 9 Active 沒有獨立天氣 API,所以我們把 Gadgetbridge 的 **`ACTI
 | Source | How to wire |
 |---|---|
 | OpenWeatherMap (用戶提供 API key) | 內建,30 分鐘輪詢一次 |
-| Breezy Weather / GBWeather | 廣播 `gg.solidarity.miband9active.ACTION_GENERIC_WEATHER` |
+| Breezy Weather / GBWeather | 廣播 `com.kidneyweakx.miband9active.ACTION_GENERIC_WEATHER` |
 | Samsung Weather | 經由「Samsung Routines」+ Tasker 橋接到 broadcast |
 | LineageOS / CM weather | 預留 receiver(暫不做,需要時補) |
 
