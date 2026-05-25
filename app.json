@@ -27,6 +27,7 @@
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
         "android.permission.READ_PHONE_STATE",
         "android.permission.VIBRATE"
       ],
@@ -49,6 +50,7 @@
       ],
       "./plugins/with-project-build-gradle.js",
       "./plugins/with-android-port.js",
+      "./plugins/with-manifest.js",
       "expo-router",
       [
         "expo-localization",
