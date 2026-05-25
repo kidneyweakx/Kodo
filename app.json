@@ -47,6 +47,13 @@
         {
           "fonts": []
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#7CF5C4"
+        }
       ]
     ],
     "experiments": {
