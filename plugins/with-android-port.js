@@ -11,7 +11,6 @@
 // We keep the port outside `android/` so `expo prebuild --clean` does not
 // nuke it.
 
-const path = require('path');
 const { withAppBuildGradle } = require('@expo/config-plugins');
 
 const EXTRA_SOURCE_SETS = `
@@ -52,10 +51,6 @@ protobuf {
 }
 `;
 
-const EXTRA_CLASSPATH = `
-        classpath 'com.google.protobuf:protobuf-gradle-plugin:0.9.4'
-`;
-
 function injectBlock(source, anchor, block, alreadyContains) {
   if (source.includes(alreadyContains)) return source;
   const idx = source.indexOf(anchor);
@@ -64,13 +59,6 @@ function injectBlock(source, anchor, block, alreadyContains) {
   }
   const insertAt = idx + anchor.length;
   return source.slice(0, insertAt) + '\n' + block + '\n' + source.slice(insertAt);
-}
-
-function appendBeforeClosing(source, closingMarker, block, alreadyContains) {
-  if (source.includes(alreadyContains)) return source;
-  const idx = source.lastIndexOf(closingMarker);
-  if (idx === -1) throw new Error(`with-android-port: closing marker not found: ${closingMarker}`);
-  return source.slice(0, idx) + '\n' + block + '\n' + source.slice(idx);
 }
 
 const withAndroidPort = (config) => {

@@ -172,37 +172,51 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
         driver?.disconnect()
     }
 
+    /** Enable/disable the WorkManager-driven 30-min background sync. */
+    fun setPeriodicSync(enabled: Boolean, intervalMinutes: Long = 30) {
+        if (enabled) {
+            com.kidneyweakx.miband9active.sync.MiBand9PeriodicSyncWorker.enable(AppContext.context, intervalMinutes)
+        } else {
+            com.kidneyweakx.miband9active.sync.MiBand9PeriodicSyncWorker.disable(AppContext.context)
+        }
+    }
+
     override fun syncSince(sinceIso: String): Promise<Double> = Promise.async {
         val drv = driver ?: throw IllegalStateException("Not connected")
         val fetcher = com.kidneyweakx.miband9active.xiaomi.activity.XiaomiActivityFileFetcher()
-        var filesParsed = 0
+        val filesParsed = java.util.concurrent.atomic.AtomicInteger(0)
+        val lastChunkAt = java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis())
+
+        fetcher.onFile = { parsed ->
+            when (parsed) {
+                is com.kidneyweakx.miband9active.xiaomi.activity.ParsedActivityFile.DailySamples -> {
+                    com.kidneyweakx.miband9active.SampleStore.persistActivity(parsed.samples)
+                    filesParsed.incrementAndGet()
+                }
+                is com.kidneyweakx.miband9active.xiaomi.activity.ParsedActivityFile.Sleep -> {
+                    val dayIso = parsed.fileId.timestamp.toInstant().toString().substring(0, 10)
+                    com.kidneyweakx.miband9active.SampleStore.persistSleep(
+                        dayIso,
+                        parsed.sleep.summary,
+                        parsed.sleep.stages,
+                    )
+                    filesParsed.incrementAndGet()
+                }
+                is com.kidneyweakx.miband9active.xiaomi.activity.ParsedActivityFile.Unknown -> Unit
+            }
+            scope.launch { ackRecordedData(drv, parsed.fileId()) }
+        }
 
         // 1) Subscribe to incoming activity chunks BEFORE sending the request
         //    so we don't drop the first packet.
         val collector = scope.launch {
             drv.activityChunks.collect { chunk ->
+                lastChunkAt.set(System.currentTimeMillis())
                 fetcher.addChunk(chunk)
-                // Heuristic: when a chunk smaller than the MTU arrives we assume
-                // it was the tail of a file and try to parse.
-                val parsed = fetcher.finalizeFile() ?: return@collect
-                when (parsed) {
-                    is com.kidneyweakx.miband9active.xiaomi.activity.ParsedActivityFile.DailySamples -> {
-                        com.kidneyweakx.miband9active.SampleStore.persistActivity(parsed.samples)
-                        filesParsed++
-                    }
-                    is com.kidneyweakx.miband9active.xiaomi.activity.ParsedActivityFile.Sleep -> {
-                        val dayIso = parsed.fileId.timestamp.toInstant().toString().substring(0, 10)
-                        com.kidneyweakx.miband9active.SampleStore.persistSleep(dayIso, parsed.sleep.summary, parsed.sleep.stages)
-                        filesParsed++
-                    }
-                    is com.kidneyweakx.miband9active.xiaomi.activity.ParsedActivityFile.Unknown -> {
-                        // Drop — unknown subtype is not actionable.
-                    }
-                }
             }
         }
 
-        // 2) Ask the band for today's activity file list. The band then streams
+        // 2) Ask the band for today's activity file list. Band streams
         //    chunks back on the ACTIVITY channel.
         drv.sendCommand(
             nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto.Command.newBuilder()
@@ -220,12 +234,34 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
                 .build(),
         )
 
-        // 3) Give the band up to 15 s to stream chunks back. Real "done"
-        //    signalling would come from the band's reply on the protobuf
-        //    channel; we treat 15 s of silence as completion.
-        kotlinx.coroutines.delay(15_000)
+        // 3) Per upstream: a 5 s of silence after the last chunk means the
+        //    band has nothing more to send. Cap the whole sync at 60 s.
+        val deadline = System.currentTimeMillis() + 60_000
+        while (System.currentTimeMillis() < deadline) {
+            kotlinx.coroutines.delay(1_000)
+            if (System.currentTimeMillis() - lastChunkAt.get() > 5_000) break
+        }
         collector.cancel()
-        filesParsed.toDouble()
+        filesParsed.get().toDouble()
+    }
+
+    /** Tell the band we got this file so it can purge it from on-band flash. */
+    private suspend fun ackRecordedData(
+        drv: MiBand9BleDriver,
+        fileId: com.kidneyweakx.miband9active.xiaomi.activity.XiaomiActivityFileId,
+    ) {
+        drv.sendCommand(
+            nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto.Command.newBuilder()
+                .setType(com.kidneyweakx.miband9active.xiaomi.services.HealthCommands.COMMAND_TYPE)
+                .setSubtype(3) // ack
+                .setHealth(
+                    nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto.Health.newBuilder()
+                        .setActivitySyncAckFileIds(
+                            com.google.protobuf.ByteString.copyFrom(fileId.toBytes()),
+                        ),
+                )
+                .build(),
+        )
     }
 
     override fun fetchTodaySummary(): Promise<Variant_NullType_HealthDailySummary> = Promise.async {

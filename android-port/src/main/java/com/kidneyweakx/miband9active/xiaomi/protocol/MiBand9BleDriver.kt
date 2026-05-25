@@ -310,6 +310,11 @@ class MiBand9BleDriver(
         sendRaw(command.toByteArray(), XiaomiChannel.PROTOBUF, encrypt = true)
     }
 
+    /** Plaintext data-channel write for chunked file uploads. */
+    suspend fun sendData(bytes: ByteArray) {
+        sendRaw(bytes, XiaomiChannel.DATA, encrypt = false)
+    }
+
     private suspend fun sendRaw(payload: ByteArray, channel: XiaomiChannel, encrypt: Boolean) {
         val opCode = if (encrypt) XiaomiSppPacketV2.Data.OPCODE_SEND_ENCRYPTED
             else XiaomiSppPacketV2.Data.OPCODE_SEND_PLAINTEXT

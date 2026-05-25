@@ -20,7 +20,8 @@
     "HybridGpsTracker": { "android": { "language": "kotlin", "implementationClassName": "HybridGpsTracker" } },
     "HybridSedentary": { "android": { "language": "kotlin", "implementationClassName": "HybridSedentary" } },
     "HybridWeatherProvider": { "android": { "language": "kotlin", "implementationClassName": "HybridWeatherProvider" } },
-    "HybridHealthConnect": { "android": { "language": "kotlin", "implementationClassName": "HybridHealthConnect" } }
+    "HybridHealthConnect": { "android": { "language": "kotlin", "implementationClassName": "HybridHealthConnect" } },
+    "HybridWatchface": { "android": { "language": "kotlin", "implementationClassName": "HybridWatchface" } }
   },
   "ignorePaths": ["node_modules", "vendor"]
 }
