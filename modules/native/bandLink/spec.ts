@@ -63,4 +63,17 @@ export interface HybridBandLink
   onConnectionStateChange(listener: (state: ConnectionState) => void): () => void;
   onBatteryChange(listener: (battery: BatteryInfo) => void): () => void;
   onScanResult(listener: (band: DiscoveredBand) => void): () => void;
+
+  /**
+   * Live sync progress. `phase` is human-displayable ("Heart rate",
+   * "Sleep", ...) and `progress` is 0..1. Used to drive the dashboard's
+   * live sync banner. Fires on the same dispatch as native sync I/O.
+   */
+  onSyncProgress(
+    listener: (event: {
+      readonly phase: string;
+      readonly progress: number;
+      readonly startedAt: number;
+    }) => void,
+  ): () => void;
 }

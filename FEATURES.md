@@ -80,9 +80,26 @@
 | Alarms — slot count from device | ✅ (`getAlarmSlotCount`) |
 | Smart wakeup window | ✅ |
 | Reminders (≤ 20 chars) | ✅ |
+| **Inactivity / 久坐提醒** | ✅ (`XiaomiPreferences.FEAT_INACTIVITY`) |
 | Calendar events sync | ✅ |
-| Weather push | ✅ |
+| Weather push | ✅ (詳見 §12) |
 | World clocks | ❌ skip (slot count = 0 upstream) |
+
+## 6b. Camera remote / 拍照遙控 ⭐
+
+| Feature | Status |
+|---|---|
+| 從手環觸發手機快門 | ✅ (`XiaomiSystemService.handleCameraRemote` + `setCameraRemoteConfig`) |
+| 同步前端用 `CameraX` PreviewView,從 Nitro 接 shutter event | 規劃中 |
+
+## 6c. GPS / 健身路徑
+
+| Feature | Status |
+|---|---|
+| Workout 期間 phone → band 即時 GPS 推送 | ✅ (`XiaomiSupport.onSetGpsLocation`) |
+| 解析 band → phone 的 workout GPS track | ✅ (`WorkoutGpsParser`) |
+| 背景 GPS 追蹤(僅運動進行中) | 規劃中 — `FOREGROUND_SERVICE_LOCATION` foreground only |
+| 永遠不要 `ACCESS_BACKGROUND_LOCATION` | 規範,見 docs/POWER.md |
 
 ## 7. Music / 音樂控制
 
@@ -123,6 +140,32 @@ No runtime locale downloads. No third-party language packs.
 | BLE scan window during auto-reconnect | 1.2s every 12s (low duty) | 比 upstream 預設更保守 |
 | Notification icon bitmap | downscale to 24×24, lossless palette | 減少封包與 flash 寫入 |
 | Background workers | foreground service only when actively syncing | 平時不常駐 |
+
+## 12. Weather provider / 天氣資料來源
+
+Mi Band 9 Active 沒有獨立天氣 API,所以我們把 Gadgetbridge 的 **`ACTION_GENERIC_WEATHER` Intent broadcast** 接過來,任何外部 App(GBWeather、Tasker、Breezy Weather、OWMW、Samsung Weather + Bixby Routine 橋接)都可以推天氣給我們,我們再經 `HybridWeatherBridge.push()` 寫到手環。
+
+| Source | How to wire |
+|---|---|
+| OpenWeatherMap (用戶提供 API key) | 內建,30 分鐘輪詢一次 |
+| Breezy Weather / GBWeather | 廣播 `gg.solidarity.miband9active.ACTION_GENERIC_WEATHER` |
+| Samsung Weather | 經由「Samsung Routines」+ Tasker 橋接到 broadcast |
+| LineageOS / CM weather | 預留 receiver(暫不做,需要時補) |
+
+## 13. Health Connect export(Fitbit / Samsung Health / Google Fit 共用)⭐
+
+Android 上 Fitbit/Samsung Health/Google Fit 都從 **Health Connect** 統一讀資料。我們的 Nitro `HybridHealthConnect` 把每日的心率、SpO₂、步數、睡眠 stage 寫進 Health Connect;Fitbit 開啟「在 Health Connect 中允許讀取」即可同步。
+
+| Record | Source field | Target Health Connect type |
+|---|---|---|
+| Steps | `HealthDailySummary.steps` | `StepsRecord` |
+| Heart rate (resting) | `HealthDailySummary.restingHeartRate` | `HeartRateRecord` |
+| SpO₂ avg | `HealthDailySummary.spo2Average` | `OxygenSaturationRecord` |
+| Sleep stages | `SleepSegment[]` | `SleepSessionRecord` + `SleepStageRecord` |
+| Active calories | `HealthDailySummary.activeCalories` | `ActiveCaloriesBurnedRecord` |
+| Distance | `HealthDailySummary.distanceMeters` | `DistanceRecord` |
+
+Ported from `Gadgetbridge/app/src/main/java/.../util/healthconnect/` (Kotlin).
 
 ## 11. Excluded / 不做
 

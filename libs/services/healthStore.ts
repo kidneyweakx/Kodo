@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 
 import { cache, cacheKeys } from '@/libs/services/cache';
 import { NativeHealthStore } from '@/modules/native';
+import { syncStatus } from '@/libs/services/syncStatus';
 import type { HealthDailySummary } from '@/modules/native';
 
 const todayIso = (): string => new Date().toISOString().slice(0, 10);
@@ -42,18 +43,31 @@ export const healthStore = {
 export function useDashboardSummary(dateIso: string = todayIso()): DashboardReadModel {
   const [model, setModel] = useState<DashboardReadModel>(() => readDashboardSync(dateIso));
 
+  // Background revalidation on mount.
   useEffect(() => {
     let cancelled = false;
-    const tick = () => {
+    try {
       const fresh = healthStore.refreshDashboard(dateIso);
       if (!cancelled && fresh) {
         setModel({ summary: fresh, state: 'fresh', ageMs: 0 });
       }
-    };
-    tick();
+    } catch {
+      /* native not loaded */
+    }
     return () => {
       cancelled = true;
     };
+  }, [dateIso]);
+
+  // Re-read whenever a sync finishes — this is what makes the dashboard
+  // update *as* the band streams data in.
+  useEffect(() => {
+    return syncStatus.subscribe((s) => {
+      if (s.phase === 'idle' || s.phase === 'done') {
+        const next = readDashboardSync(dateIso);
+        if (next.summary) setModel(next);
+      }
+    });
   }, [dateIso]);
 
   return model;

@@ -20,6 +20,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { AmbientBlobs } from '@/components/dashboard/AmbientBlobs';
 import { HeroSummary } from '@/components/dashboard/HeroSummary';
 import { MetricCard } from '@/components/dashboard/MetricCard';
+import { SyncStatusBar } from '@/components/dashboard/SyncStatusBar';
 import { useConnectionState, usePairedBand } from '@/libs/services/bandLink';
 import { useDashboardSummary } from '@/libs/services/healthStore';
 import { t } from '@/libs/services/i18n';
@@ -126,6 +127,8 @@ export default function TodayScreen() {
             {paired?.name ?? t('app.name')}
           </ThemedText>
         </Animated.View>
+
+        <SyncStatusBar />
 
         <HeroSummary
           steps={dashboard.summary?.steps ?? null}

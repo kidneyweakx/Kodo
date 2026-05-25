@@ -10,67 +10,59 @@
  */
 
 import { NitroModules } from 'react-native-nitro-modules';
+import type { HybridObject } from 'react-native-nitro-modules';
 
 import type { HybridBandLink } from '@/modules/native/bandLink/spec';
 import type { HybridCalendarBridge } from '@/modules/native/calendar/spec';
+import type { HybridCameraRemote } from '@/modules/native/cameraRemote/spec';
+import type { HybridGpsTracker } from '@/modules/native/gps/spec';
+import type { HybridHealthConnect } from '@/modules/native/healthConnect/spec';
 import type { HybridHealthStore } from '@/modules/native/health/spec';
 import type { HybridMusicBridge } from '@/modules/native/music/spec';
 import type { HybridNotificationBridge } from '@/modules/native/notifications/spec';
+import type { HybridSedentary } from '@/modules/native/sedentary/spec';
 import type { HybridSystemControl } from '@/modules/native/system/spec';
 import type { HybridWeatherBridge } from '@/modules/native/weather/spec';
+import type { HybridWeatherProvider } from '@/modules/native/weatherProvider/spec';
 
-let _bandLink: HybridBandLink | null = null;
-let _health: HybridHealthStore | null = null;
-let _notifications: HybridNotificationBridge | null = null;
-let _system: HybridSystemControl | null = null;
-let _music: HybridMusicBridge | null = null;
-let _weather: HybridWeatherBridge | null = null;
-let _calendar: HybridCalendarBridge | null = null;
-
-export const NativeBandLink = (): HybridBandLink => {
-  if (!_bandLink) _bandLink = NitroModules.createHybridObject<HybridBandLink>('BandLink');
-  return _bandLink;
+const lazyHybrid = <T extends HybridObject<{ android: 'kotlin' }>>(name: string) => {
+  let instance: T | null = null;
+  return (): T => {
+    if (!instance) instance = NitroModules.createHybridObject<T>(name);
+    return instance;
+  };
 };
 
-export const NativeHealthStore = (): HybridHealthStore => {
-  if (!_health) _health = NitroModules.createHybridObject<HybridHealthStore>('HealthStore');
-  return _health;
-};
-
-export const NativeNotificationBridge = (): HybridNotificationBridge => {
-  if (!_notifications)
-    _notifications = NitroModules.createHybridObject<HybridNotificationBridge>('NotificationBridge');
-  return _notifications;
-};
-
-export const NativeSystemControl = (): HybridSystemControl => {
-  if (!_system) _system = NitroModules.createHybridObject<HybridSystemControl>('SystemControl');
-  return _system;
-};
-
-export const NativeMusicBridge = (): HybridMusicBridge => {
-  if (!_music) _music = NitroModules.createHybridObject<HybridMusicBridge>('MusicBridge');
-  return _music;
-};
-
-export const NativeWeatherBridge = (): HybridWeatherBridge => {
-  if (!_weather) _weather = NitroModules.createHybridObject<HybridWeatherBridge>('WeatherBridge');
-  return _weather;
-};
-
-export const NativeCalendarBridge = (): HybridCalendarBridge => {
-  if (!_calendar) _calendar = NitroModules.createHybridObject<HybridCalendarBridge>('CalendarBridge');
-  return _calendar;
-};
+export const NativeBandLink = lazyHybrid<HybridBandLink>('BandLink');
+export const NativeHealthStore = lazyHybrid<HybridHealthStore>('HealthStore');
+export const NativeNotificationBridge = lazyHybrid<HybridNotificationBridge>('NotificationBridge');
+export const NativeSystemControl = lazyHybrid<HybridSystemControl>('SystemControl');
+export const NativeMusicBridge = lazyHybrid<HybridMusicBridge>('MusicBridge');
+export const NativeWeatherBridge = lazyHybrid<HybridWeatherBridge>('WeatherBridge');
+export const NativeCalendarBridge = lazyHybrid<HybridCalendarBridge>('CalendarBridge');
+export const NativeCameraRemote = lazyHybrid<HybridCameraRemote>('CameraRemote');
+export const NativeGpsTracker = lazyHybrid<HybridGpsTracker>('GpsTracker');
+export const NativeSedentary = lazyHybrid<HybridSedentary>('Sedentary');
+export const NativeWeatherProvider = lazyHybrid<HybridWeatherProvider>('WeatherProvider');
+export const NativeHealthConnect = lazyHybrid<HybridHealthConnect>('HealthConnect');
 
 export type {
   HybridBandLink,
   HybridCalendarBridge,
+  HybridCameraRemote,
+  HybridGpsTracker,
+  HybridHealthConnect,
   HybridHealthStore,
   HybridMusicBridge,
   HybridNotificationBridge,
+  HybridSedentary,
   HybridSystemControl,
   HybridWeatherBridge,
+  HybridWeatherProvider,
 };
 
 export * from '@/modules/native/types';
+export type { GpsSample, WorkoutType } from '@/modules/native/gps/spec';
+export type { SedentaryConfig } from '@/modules/native/sedentary/spec';
+export type { OwmConfig } from '@/modules/native/weatherProvider/spec';
+export type { HealthConnectKind, HealthConnectStatus } from '@/modules/native/healthConnect/spec';

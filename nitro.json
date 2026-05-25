@@ -12,7 +12,12 @@
     "SystemControl": { "cpp": "HybridSystemControl", "kotlin": "HybridSystemControl" },
     "MusicBridge": { "cpp": "HybridMusicBridge", "kotlin": "HybridMusicBridge" },
     "WeatherBridge": { "cpp": "HybridWeatherBridge", "kotlin": "HybridWeatherBridge" },
-    "CalendarBridge": { "cpp": "HybridCalendarBridge", "kotlin": "HybridCalendarBridge" }
+    "CalendarBridge": { "cpp": "HybridCalendarBridge", "kotlin": "HybridCalendarBridge" },
+    "CameraRemote": { "cpp": "HybridCameraRemote", "kotlin": "HybridCameraRemote" },
+    "GpsTracker": { "cpp": "HybridGpsTracker", "kotlin": "HybridGpsTracker" },
+    "Sedentary": { "cpp": "HybridSedentary", "kotlin": "HybridSedentary" },
+    "WeatherProvider": { "cpp": "HybridWeatherProvider", "kotlin": "HybridWeatherProvider" },
+    "HealthConnect": { "cpp": "HybridHealthConnect", "kotlin": "HybridHealthConnect" }
   },
   "ignorePaths": ["node_modules", "Gadgetbridge"]
 }
