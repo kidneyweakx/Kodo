@@ -6,7 +6,8 @@
  */
 
 import { Tabs } from 'expo-router';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
+import { BlurView } from 'expo-blur';
 
 import { Spacing } from '@/constants/DesignSystem';
 import { useTheme } from '@/context/ThemeContext';
@@ -40,18 +41,32 @@ function TabDot({ focused }: { readonly focused: boolean }) {
 }
 
 export default function TabsLayout() {
-  const { theme } = useTheme();
+  const { theme, resolvedMode } = useTheme();
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
+        tabBarActiveTintColor: theme.accent,
+        tabBarInactiveTintColor: theme.text.tertiary,
         tabBarStyle: {
-          backgroundColor: theme.background.secondary,
+          position: 'absolute',
+          backgroundColor: Platform.select({
+            android: theme.background.secondary,
+            default: 'transparent',
+          }),
           borderTopColor: theme.glassBorder,
-          height: 68,
+          height: 76,
           paddingTop: Spacing.sm,
+          paddingBottom: Spacing.md,
         },
+        tabBarBackground: () => (
+          <BlurView
+            tint={resolvedMode === 'light' ? 'light' : 'dark'}
+            intensity={Platform.OS === 'android' ? 0 : 30}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          />
+        ),
       }}
     >
       <Tabs.Screen

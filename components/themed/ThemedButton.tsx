@@ -15,7 +15,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { Radius, Shadow, Size, Spacing, Typography } from '@/constants/DesignSystem';
+import { Motion, Radius, Shadow, Size, Spacing, Typography } from '@/constants/DesignSystem';
 import { useTheme } from '@/context/ThemeContext';
 import { readableTextOn } from '@/components/themed/contrast';
 import { ThemedText } from '@/components/themed/ThemedText';
@@ -85,13 +85,13 @@ export function ThemedButton({
     haptic ?? (variant === 'destructive' ? 'warning' : variant === 'primary' ? 'tap' : 'selection');
 
   const onPressIn = useCallback(() => {
-    scale.value = withSpring(0.97, { stiffness: 320, damping: 22, mass: 0.7 });
-    press.value = withTiming(1, { duration: 120 });
+    scale.value = withSpring(0.97, Motion.spring.press);
+    press.value = withTiming(1, { duration: Motion.duration.micro });
   }, [scale, press]);
 
   const onPressOut = useCallback(() => {
-    scale.value = withSpring(1, { stiffness: 260, damping: 18 });
-    press.value = withTiming(0, { duration: 220 });
+    scale.value = withSpring(1, Motion.spring.sheet);
+    press.value = withTiming(0, { duration: Motion.duration.fast });
   }, [scale, press]);
 
   const handlePress = useCallback(
@@ -197,11 +197,11 @@ export function ThemedIconButton({
   const dim = heightFor(size);
 
   const onPressIn = useCallback(() => {
-    scale.value = withSpring(0.92, { stiffness: 320, damping: 20 });
+    scale.value = withSpring(0.92, Motion.spring.press);
   }, [scale]);
 
   const onPressOut = useCallback(() => {
-    scale.value = withSpring(1, { stiffness: 260, damping: 18 });
+    scale.value = withSpring(1, Motion.spring.sheet);
   }, [scale]);
 
   const handlePress = useCallback(
