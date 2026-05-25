@@ -36,6 +36,8 @@
       }
     },
     "plugins": [
+      "./plugins/with-project-build-gradle.js",
+      "./plugins/with-android-port.js",
       "expo-router",
       [
         "expo-localization",
