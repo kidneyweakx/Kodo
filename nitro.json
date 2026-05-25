@@ -1,0 +1,49 @@
+{
+  "$schema": "https://nitro.margelo.com/schemas/nitro.json",
+  "cxxNamespace": ["miband9active"],
+  "ios": {
+    "iosModulename": "MiBand9ActiveNitro"
+  },
+  "android": {
+    "androidNamespace": ["miband9active"],
+    "androidCxxLibName": "MiBand9ActiveNitro"
+  },
+  "autolinking": {
+    "BandLink": {
+      "cpp": "HybridBandLink",
+      "swift": "HybridBandLink",
+      "kotlin": "HybridBandLink"
+    },
+    "HealthStore": {
+      "cpp": "HybridHealthStore",
+      "swift": "HybridHealthStore",
+      "kotlin": "HybridHealthStore"
+    },
+    "NotificationBridge": {
+      "cpp": "HybridNotificationBridge",
+      "swift": "HybridNotificationBridge",
+      "kotlin": "HybridNotificationBridge"
+    },
+    "SystemControl": {
+      "cpp": "HybridSystemControl",
+      "swift": "HybridSystemControl",
+      "kotlin": "HybridSystemControl"
+    },
+    "MusicBridge": {
+      "cpp": "HybridMusicBridge",
+      "swift": "HybridMusicBridge",
+      "kotlin": "HybridMusicBridge"
+    },
+    "WeatherBridge": {
+      "cpp": "HybridWeatherBridge",
+      "swift": "HybridWeatherBridge",
+      "kotlin": "HybridWeatherBridge"
+    },
+    "CalendarBridge": {
+      "cpp": "HybridCalendarBridge",
+      "swift": "HybridCalendarBridge",
+      "kotlin": "HybridCalendarBridge"
+    }
+  },
+  "ignorePaths": ["node_modules", "Gadgetbridge"]
+}
