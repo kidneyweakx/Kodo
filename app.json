@@ -1,0 +1,70 @@
+{
+  "expo": {
+    "name": "Mi Band 9 Active",
+    "slug": "mi-band-9-active",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "scheme": "miband9active",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0A0B"
+    },
+    "ios": {
+      "bundleIdentifier": "gg.solidarity.miband9active",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "與你的小米手環 9 Active 連線以同步健康資料 / Connect to your Mi Band 9 Active to sync health data.",
+        "NSBluetoothPeripheralUsageDescription": "與你的小米手環 9 Active 連線以同步健康資料 / Connect to your Mi Band 9 Active to sync health data."
+      }
+    },
+    "android": {
+      "package": "gg.solidarity.miband9active",
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE",
+        "android.permission.READ_PHONE_STATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.VIBRATE"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0A0B"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": ["en", "zh-Hant"]
+        }
+      ],
+      [
+        "expo-font",
+        {
+          "fonts": []
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      }
+    }
+  }
+}
