@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 
 import { cache, cacheKeys } from '@/libs/services/cache';
 import { NativeNotificationBridge } from '@/modules/native';
+import { safeAsync, safeCall } from '@/modules/native/safe';
 import type { NotificationPushRequest } from '@/modules/native';
 
 export interface NotificationFilter {
@@ -19,40 +20,46 @@ export interface NotificationFilter {
 
 export const notificationBridge = {
   isAccessGrantedSync(): boolean {
-    try {
-      return NativeNotificationBridge().notificationAccessGranted;
-    } catch {
-      return false;
-    }
+    return safeCall(() => NativeNotificationBridge().notificationAccessGranted, false);
   },
 
   requestAccess(): void {
-    NativeNotificationBridge().requestAccess();
+    safeCall(() => NativeNotificationBridge().requestAccess(), undefined);
   },
 
   push(request: NotificationPushRequest): Promise<void> {
-    return NativeNotificationBridge().push(request);
+    return safeAsync(() => NativeNotificationBridge().push(request), undefined);
   },
 
   getFilters(): readonly NotificationFilter[] {
     const cached = cache.getSync<NotificationFilter[]>(cacheKeys.notificationFilters);
-    return cached ?? NativeNotificationBridge().getFilters();
+    if (cached) return cached;
+    return safeCall<readonly NotificationFilter[]>(
+      () => NativeNotificationBridge().getFilters(),
+      [],
+    );
   },
 
   setFilter(filter: NotificationFilter): void {
-    NativeNotificationBridge().setFilter(filter);
-    const list = NativeNotificationBridge().getFilters();
+    safeCall(() => NativeNotificationBridge().setFilter(filter), undefined);
+    const list = safeCall<readonly NotificationFilter[]>(
+      () => NativeNotificationBridge().getFilters(),
+      [],
+    );
     cache.set(cacheKeys.notificationFilters, list);
   },
 
   removeFilter(sourceId: string): void {
-    NativeNotificationBridge().removeFilter(sourceId);
-    const list = NativeNotificationBridge().getFilters();
+    safeCall(() => NativeNotificationBridge().removeFilter(sourceId), undefined);
+    const list = safeCall<readonly NotificationFilter[]>(
+      () => NativeNotificationBridge().getFilters(),
+      [],
+    );
     cache.set(cacheKeys.notificationFilters, list);
   },
 
   setMuteWhenDnd(enabled: boolean): void {
-    NativeNotificationBridge().setMuteWhenDnd(enabled);
+    safeCall(() => NativeNotificationBridge().setMuteWhenDnd(enabled), undefined);
     cache.set(cacheKeys.muteWhenDnd, enabled);
   },
 

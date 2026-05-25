@@ -1,5 +1,5 @@
 /*
- * mi-band-9-active — JS facade over HybridBandLink.
+ * mi-band-9-active — JS facade over HybridBandLink (safe-mode).
  * Copyright (C) 2026 kidneyweakx
  *
  * AGPL-3.0-or-later. See LICENSE, NOTICE.md.
@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 
 import { cache, cacheKeys } from '@/libs/services/cache';
 import { NativeBandLink } from '@/modules/native';
+import { safeAsync, safeCall, safeUnsubscribe } from '@/modules/native/safe';
 import type { ConnectionState, DiscoveredBand, PairedBand } from '@/modules/native';
 
 export const bandLink = {
@@ -16,12 +17,12 @@ export const bandLink = {
     return cache.getSync<PairedBand>(cacheKeys.pairedBand);
   },
 
-  async scan(durationMs = 12_000): Promise<readonly DiscoveredBand[]> {
-    return NativeBandLink().scan({ durationMs });
+  scan(durationMs = 12_000): Promise<readonly DiscoveredBand[]> {
+    return safeAsync(() => NativeBandLink().scan({ durationMs }), []);
   },
 
   stopScan(): void {
-    NativeBandLink().stopScan();
+    safeCall(() => NativeBandLink().stopScan(), undefined);
   },
 
   async pair(deviceId: string, authKey: string): Promise<PairedBand> {
@@ -31,38 +32,44 @@ export const bandLink = {
   },
 
   async forget(): Promise<void> {
-    await NativeBandLink().forget();
+    await safeAsync(() => NativeBandLink().forget(), undefined);
     cache.remove(cacheKeys.pairedBand);
   },
 
-  async connect(): Promise<void> {
-    await NativeBandLink().connect();
+  connect(): Promise<void> {
+    return safeAsync(() => NativeBandLink().connect(), undefined);
   },
 
   disconnect(): void {
-    NativeBandLink().disconnect();
+    safeCall(() => NativeBandLink().disconnect(), undefined);
   },
 
   async syncSince(sinceIso: string): Promise<number> {
-    const count = await NativeBandLink().syncSince(sinceIso);
+    const count = await safeAsync(() => NativeBandLink().syncSince(sinceIso), 0);
     cache.set(cacheKeys.lastSyncAt, new Date().toISOString());
     return count;
   },
 };
 
+const initialConnectionState = (): ConnectionState =>
+  safeCall(() => NativeBandLink().connectionState, 'disconnected');
+
 export function useConnectionState(): ConnectionState {
-  const [state, setState] = useState<ConnectionState>(() => NativeBandLink().connectionState);
-  useEffect(() => NativeBandLink().onConnectionStateChange(setState), []);
+  const [state, setState] = useState<ConnectionState>(initialConnectionState);
+  useEffect(() => safeUnsubscribe(() => NativeBandLink().onConnectionStateChange(setState)), []);
   return state;
 }
 
 export function usePairedBand(): PairedBand | null {
   const [band, setBand] = useState<PairedBand | null>(() => bandLink.getPairedSync());
-  useEffect(() => {
-    const unsub = NativeBandLink().onConnectionStateChange(() => {
-      setBand(NativeBandLink().currentBand);
-    });
-    return unsub;
-  }, []);
+  useEffect(
+    () =>
+      safeUnsubscribe(() =>
+        NativeBandLink().onConnectionStateChange(() => {
+          setBand(safeCall(() => NativeBandLink().currentBand, bandLink.getPairedSync()));
+        }),
+      ),
+    [],
+  );
   return band;
 }

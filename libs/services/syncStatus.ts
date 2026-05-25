@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 
 import { cache, cacheKeys } from '@/libs/services/cache';
 import { NativeBandLink } from '@/modules/native';
+import { safeUnsubscribe } from '@/modules/native/safe';
 
 export type SyncPhase =
   | 'idle'
@@ -54,8 +55,8 @@ let nativeUnsub: (() => void) | null = null;
 
 const ensureNativeSubscribed = () => {
   if (nativeUnsub) return;
-  try {
-    nativeUnsub = NativeBandLink().onSyncProgress(({ phase, progress, startedAt }) => {
+  nativeUnsub = safeUnsubscribe(() =>
+    NativeBandLink().onSyncProgress(({ phase, progress, startedAt }) => {
       const known: SyncPhase = (
         ['idle', 'connecting', 'health', 'sleep', 'workouts', 'settings', 'done', 'error'] as const
       ).includes(phase as SyncPhase)
@@ -74,10 +75,8 @@ const ensureNativeSubscribed = () => {
         cache.set(cacheKeys.lastSyncAt, finishedAt);
         emit({ ...snapshot, phase: 'idle', progress: 0, label: '', lastSyncedAt: finishedAt });
       }
-    });
-  } catch {
-    // Native side not loaded in dev — silently no-op.
-  }
+    }),
+  );
 };
 
 export const syncStatus = {

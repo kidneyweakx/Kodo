@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 
 import { cache, cacheKeys } from '@/libs/services/cache';
 import { NativeHealthStore } from '@/modules/native';
+import { safeCall } from '@/modules/native/safe';
 import { syncStatus } from '@/libs/services/syncStatus';
 import type { HealthDailySummary } from '@/modules/native';
 
@@ -34,7 +35,10 @@ export const healthStore = {
   readDashboardSync,
 
   refreshDashboard(dateIso = todayIso()): HealthDailySummary | null {
-    const fresh = NativeHealthStore().getDailySummary(dateIso);
+    const fresh = safeCall<HealthDailySummary | null>(
+      () => NativeHealthStore().getDailySummary(dateIso),
+      null,
+    );
     if (fresh) cache.set(cacheKeys.dashboardSummary(dateIso), fresh);
     return fresh;
   },
