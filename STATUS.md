@@ -2,63 +2,93 @@
 
 Generated: 2026-05-26
 
----
-
-## ✅ Now compiles end-to-end
-
-`bun expo prebuild --platform android` followed by `./gradlew :app:compileDebugKotlin` is **green**. The Kotlin port lives under `android-port/` and is bundled into the Android source set by `plugins/with-android-port.js`. Protobuf is generated from `android-port/src/main/proto/xiaomi.proto` at build time.
-
-Build matrix:
-- minSdk **26** (Health Connect requirement)
-- compileSdk **36**, targetSdk **35**
-- Kotlin **2.1.20**
-- Expo SDK 56.0.4 / RN 0.85.3 / Reanimated 4.3.1 / Nitro Modules 0.35.7
-- Bouncycastle 1.78.1, protobuf-javalite 3.25.5, kotlinx-coroutines 1.9.0, androidx.health.connect 1.1.0-rc02
-
-## ✅ Kotlin port shipped under `android-port/`
-
-| File | Mirrors upstream | Notes |
-|---|---|---|
-| `proto/xiaomi.proto` | `vendor/Gadgetbridge/.../proto/xiaomi.proto` | verbatim copy; `protoc` generates `XiaomiProto.java` |
-| `xiaomi/XiaomiWeatherConditions.kt` | `XiaomiWeatherConditions.java` | OWM → Xiaomi code mapping |
-| `xiaomi/XiaomiWorkoutType.kt` | `XiaomiWorkoutType.java` | first-class kinds + i18n keys |
-| `xiaomi/activity/XiaomiActivityFileId.kt` | `XiaomiActivityFileId.java` | 7-byte file id + nested Type/Subtype/DetailType |
-| `xiaomi/activity/XiaomiComplexActivityParser.kt` | `XiaomiComplexActivityParser.java` | bit-packed sample stream reader |
-| `xiaomi/activity/XiaomiActivitySample.kt` | `XiaomiActivitySample.java` | data class (no GreenDAO) |
-| `xiaomi/activity/DailyDetailsParser.kt` | `DailyDetailsParser.java` | bytes → List<sample> (no DB) |
-| `xiaomi/activity/SleepStagesParser.kt` | `SleepStagesParser.java` | sleep summary + stages |
-| `xiaomi/auth/XiaomiCrypto.kt` | `XiaomiAuthService.java` (crypto half) | session KDF, AES-CCM, AES-CTR, HMAC-SHA256, auth-key parser |
-| `xiaomi/auth/XiaomiAuthSession.kt` | (new) | per-connection holder for keys + counters |
-| `xiaomi/protocol/XiaomiUuids.kt` | `XiaomiUuids.java` (subset) | only Mi Band 9 Active UUIDs |
-| `xiaomi/protocol/XiaomiCharacteristicV1.kt` | `XiaomiCharacteristicV1.java` | chunked TX/RX, missing-chunk recovery, nonce counter |
-| `xiaomi/protocol/XiaomiSppPacketV2.kt` | `XiaomiSppPacketV2.java` | A5A5 framing, CRC-16/ARC, sealed Ack/SessionConfig/Data variants |
-| `xiaomi/notifications/IconConverter.kt` | `XiaomiBitmapUtils.java` (slim) | 24×24 RGB565 / ARGB8565 for the band |
-| `xiaomi/notifications/MiBand9NotificationListener.kt` | `NotificationListener.java` + `XiaomiNotificationService.java` | allow-list filter + DnD mirror, decoupled forwarder |
-| `xiaomi/services/GenericWeatherReceiver.kt` | `GenericWeatherReceiver.java` | broadcast bridge for Breezy/GBWeather/OWMW/Samsung-via-Tasker |
-| `xiaomi/services/SystemCommands.kt` | constants from `XiaomiSystemService`, `XiaomiHealthService`, etc. | wire IDs only |
-| `healthconnect/HealthConnectExporter.kt` | inspired by `util/healthconnect/*` | HR / SpO₂ / Steps / Sleep records so Fitbit/Samsung Health/Google Fit can read |
-
-## ⏳ Still TODO
-
-| Slice | Why deferred |
-|---|---|
-| `MiBand9BleDriver.kt` (Android `BluetoothGatt` + V2 protocol orchestrator + Nitro bridge) | The largest single port; couples auth-session, characteristic V1/V2, activity fetcher, and the Nitro `HybridBandLink` surface. |
-| Camera/Find Phone via `SystemService` proto messages | needs the BLE driver above |
-| Calendar / Music service implementations | needs the BLE driver above |
-| Sedentary preference editor RPC | needs the BLE driver above |
-| GPS `LocationManager` foreground service | needs the BLE driver above |
-| Watchface install (`XiaomiInstallHandler`, `XiaomiWatchfaceService`) | post-MVP |
-| Activity fetcher (`XiaomiActivityFileFetcher` + workout summary/GPS parsers) | port partially done (id + parsers); fetcher driver pending the BLE layer |
-
-Effort estimate: a focused day on `MiBand9BleDriver.kt` after the next port pass — that unlocks Camera/Calendar/Music/GPS all at once because they all dispatch through the same V2 channel.
-
-## How to verify right now
+## ✅ Builds end-to-end
 
 ```bash
 bun install
-bun expo prebuild --platform android --no-install
-cd android && ./gradlew :app:compileDebugKotlin
-# → BUILD SUCCESSFUL, XiaomiProto.java generated, .class files for our port present
+git submodule update --init     # pulls upstream Gadgetbridge (read-only reference)
+bun expo prebuild --platform android --no-install --clean
+bunx nitrogen                   # generates 12 Hybrid Kotlin + C++ specs
+cd android && ./gradlew :app:assembleDebug
+# → BUILD SUCCESSFUL, ~238 MB debug APK at android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Running the app: `bun expo run:android` will launch the JS shell. Pairing won't talk to a real band until `MiBand9BleDriver.kt` lands; everything else (theme, onboarding flow, dashboard with "尚未同步" placeholders, sync-status bar) is interactive today.
+## ✅ Nitro fully wired
+
+12 `*.nitro.ts` specs → `nitrogen` → 12 `HybridHybrid<Foo>Spec.kt` abstract classes → 12 Kotlin implementations under `com.margelo.nitro.miband9active.Hybrid<Foo>`. JS calls `NitroModules.createHybridObject<HybridBandLink>('HybridBandLink')` and gets a real Kotlin instance over JSI.
+
+| Hybrid spec | Kotlin impl | Engine wired |
+|---|---|---|
+| `HybridBandLink` | `HybridBandLink.kt` | ✅ `MiBand9BleDriver` (scan / pair / connect / GATT / V2 framing / auth). `syncSince` is the only TODO. |
+| `HybridHealthStore` | `HybridHealthStore.kt` | TODO (needs MMKV read of persisted samples) |
+| `HybridNotificationBridge` | `HybridNotificationBridge.kt` | ✅ `MiBand9NotificationListener` + SharedPreferences for allow-list and DnD mirror |
+| `HybridSystemControl` | `HybridSystemControl.kt` | In-memory prefs; band push pending the driver |
+| `HybridMusicBridge` | `HybridMusicBridge.kt` | Stub |
+| `HybridWeatherBridge` | `HybridWeatherBridge.kt` | Stub (will call `driver.sendCommand`) |
+| `HybridCalendarBridge` | `HybridCalendarBridge.kt` | Stub |
+| `HybridCameraRemote` | `HybridCameraRemote.kt` | Stub (arm/disarm flag; shutter event TBD) |
+| `HybridGpsTracker` | `HybridGpsTracker.kt` | ✅ `MiBand9GpsService` (foreground location\|connectedDevice) |
+| `HybridSedentary` | `HybridSedentary.kt` | In-memory config |
+| `HybridWeatherProvider` | `HybridWeatherProvider.kt` | ✅ `GenericWeatherReceiver` (broadcast bridge for Breezy / GBWeather / OWMW / Samsung-via-Tasker) + SharedPreferences for OWM config |
+| `HybridHealthConnect` | `HybridHealthConnect.kt` | ✅ `HealthConnectExporter` (HR / SpO₂ / Steps / SleepSession) — Fitbit / Samsung Health / Google Fit read from this |
+
+## ✅ Build matrix
+
+- minSdk **26** (Health Connect requirement), compileSdk **36**, targetSdk **35**
+- Kotlin **2.1.20** (Expo modules requirement), Gradle 9.3.1
+- Expo SDK 56.0.4, RN 0.85.3, Reanimated 4.3.1
+- Nitro Modules **0.35.7** + Nitrogen **0.35.7** (auto-codegen via `bunx nitrogen`)
+- BouncyCastle 1.78.1, protobuf-javalite 3.25.5, kotlinx-coroutines 1.9.0, androidx.health.connect 1.1.0-rc02
+
+## ✅ Engine layer (Kotlin port of Gadgetbridge) — all compile
+
+| Area | File | Mirrors upstream |
+|---|---|---|
+| Protobuf schema | `android-port/src/main/proto/xiaomi.proto` | verbatim |
+| Generated proto Java | `XiaomiProto.java` (auto, ~50 k LOC) | upstream same |
+| Conditions enum | `XiaomiWeatherConditions.kt` | `XiaomiWeatherConditions.java` |
+| Workout types | `XiaomiWorkoutType.kt` | `XiaomiWorkoutType.java` |
+| Activity file id | `xiaomi/activity/XiaomiActivityFileId.kt` | `XiaomiActivityFileId.java` |
+| Bit-packed sample reader | `XiaomiComplexActivityParser.kt` | upstream same |
+| Sample data class | `XiaomiActivitySample.kt` | upstream minus DAO |
+| Daily details parser | `DailyDetailsParser.kt` | upstream minus DB |
+| Sleep stages parser | `SleepStagesParser.kt` | upstream minus DB |
+| Activity file fetcher | `XiaomiActivityFileFetcher.kt` | upstream slim |
+| AES-CCM / CTR / HMAC | `xiaomi/auth/XiaomiCrypto.kt` | `XiaomiAuthService.java` (crypto) |
+| Auth session holder | `XiaomiAuthSession.kt` | upstream fields encapsulated |
+| Mi Band 9 Active UUIDs | `xiaomi/protocol/XiaomiUuids.kt` | filtered subset |
+| V1 char (chunk + retry) | `XiaomiCharacteristicV1.kt` | `XiaomiCharacteristicV1.java` |
+| V2 packet framing | `XiaomiSppPacketV2.kt` | `XiaomiSppPacketV2.java` (sealed-class rewrite) |
+| V2 buffer accumulator | `V2PacketAccumulator.kt` | upstream `processBuffer` |
+| GATT + V2 + auth driver | `MiBand9BleDriver.kt` | new (replaces `XiaomiBleProtocolV2` + GBDevice scaffold) |
+| Icon downscale | `xiaomi/notifications/IconConverter.kt` | `XiaomiBitmapUtils.java` (slim) |
+| NLS listener | `MiBand9NotificationListener.kt` | upstream `NotificationListener.java` |
+| Weather receiver | `xiaomi/services/GenericWeatherReceiver.kt` | upstream |
+| Command constants | `xiaomi/services/SystemCommands.kt` | upstream constants |
+| Workout GPS service | `gps/MiBand9GpsService.kt` | new |
+| App context holder | `AppContext.kt` + `InitializerProvider` | new |
+| Health Connect writer | `healthconnect/HealthConnectExporter.kt` | inspired by upstream |
+
+## ✅ Build wiring (Expo config plugins)
+
+| Plugin | Job |
+|---|---|
+| `expo-build-properties` | minSdk 26 / compileSdk 36 / kotlin 2.1.20 |
+| `plugins/with-project-build-gradle.js` | protobuf-gradle-plugin classpath |
+| `plugins/with-android-port.js` | source sets (android-port + nitrogen) + Bouncycastle / protobuf-javalite / coroutines / HealthConnect / WorkManager + protobuf plugin |
+| `plugins/with-manifest.js` | `InitializerProvider`, `MiBand9NotificationListener`, `MiBand9GpsService` (foregroundServiceType=location\|connectedDevice), `GenericWeatherReceiver` |
+
+## ⏳ What's still TODO
+
+| Slice | Why deferred |
+|---|---|
+| `HybridBandLink.syncSince` — orchestrate `XiaomiActivityFileFetcher` over `driver.activityChunks` + replay `XiaomiHealthService.fetch_activity_file` commands | parser + driver both exist; needs the loop |
+| `HybridHealthStore` MMKV read | depends on sync loop above |
+| Wire `HybridSystemControl` (clock / find-phone / preferences) through `driver.sendCommand` | mechanical after the driver runs on real hardware |
+| Wire `HybridMusicBridge` to `MediaSessionManager` + driver commands | same |
+| `HybridWeatherBridge.push` → `driver.sendCommand` with weather payload | same |
+| `HybridCalendarBridge.pushEvents` → `driver.sendCommand` | same |
+| `HybridCameraRemote.onShutter` → subscribe to `driver.incoming` (`SystemCommands.CMD_CAMERA_REMOTE_SET`) | same |
+| Watchface install (`XiaomiInstallHandler`, `XiaomiWatchfaceService`) | post-MVP |
+
+Each is one driver method call away — heavy lifting (BLE GATT, V2 framing, auth, protobuf) is done.
