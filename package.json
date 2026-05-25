@@ -22,7 +22,7 @@
     "expo-status-bar": "~56.0.3",
     "expo-system-ui": "~56.0.5",
     "expo-localization": "~56.0.4",
-    "expo-haptics": "~56.0.5",
+    "expo-haptics": "~56.0.3",
     "expo-blur": "~56.0.3",
     "expo-linear-gradient": "~56.0.4",
     "expo-font": "~56.0.5",
