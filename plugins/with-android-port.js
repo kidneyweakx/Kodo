@@ -18,6 +18,7 @@ const EXTRA_SOURCE_SETS = `
     sourceSets {
         main {
             java.srcDirs += rootProject.file('../android-port/src/main/java')
+            java.srcDirs += rootProject.file('../nitrogen/generated/android/kotlin')
             proto.srcDirs += rootProject.file('../android-port/src/main/proto')
         }
     }

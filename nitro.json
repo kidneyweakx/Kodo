@@ -1,23 +1,26 @@
 {
   "$schema": "https://nitro.margelo.com/schemas/nitro.json",
   "cxxNamespace": ["miband9active"],
+  "ios": {
+    "iosModuleName": "MiBand9ActiveNitro"
+  },
   "android": {
     "androidNamespace": ["miband9active"],
     "androidCxxLibName": "MiBand9ActiveNitro"
   },
   "autolinking": {
-    "BandLink": { "cpp": "HybridBandLink", "kotlin": "HybridBandLink" },
-    "HealthStore": { "cpp": "HybridHealthStore", "kotlin": "HybridHealthStore" },
-    "NotificationBridge": { "cpp": "HybridNotificationBridge", "kotlin": "HybridNotificationBridge" },
-    "SystemControl": { "cpp": "HybridSystemControl", "kotlin": "HybridSystemControl" },
-    "MusicBridge": { "cpp": "HybridMusicBridge", "kotlin": "HybridMusicBridge" },
-    "WeatherBridge": { "cpp": "HybridWeatherBridge", "kotlin": "HybridWeatherBridge" },
-    "CalendarBridge": { "cpp": "HybridCalendarBridge", "kotlin": "HybridCalendarBridge" },
-    "CameraRemote": { "cpp": "HybridCameraRemote", "kotlin": "HybridCameraRemote" },
-    "GpsTracker": { "cpp": "HybridGpsTracker", "kotlin": "HybridGpsTracker" },
-    "Sedentary": { "cpp": "HybridSedentary", "kotlin": "HybridSedentary" },
-    "WeatherProvider": { "cpp": "HybridWeatherProvider", "kotlin": "HybridWeatherProvider" },
-    "HealthConnect": { "cpp": "HybridHealthConnect", "kotlin": "HybridHealthConnect" }
+    "HybridBandLink": { "android": { "language": "kotlin", "implementationClassName": "HybridBandLink" } },
+    "HybridHealthStore": { "android": { "language": "kotlin", "implementationClassName": "HybridHealthStore" } },
+    "HybridNotificationBridge": { "android": { "language": "kotlin", "implementationClassName": "HybridNotificationBridge" } },
+    "HybridSystemControl": { "android": { "language": "kotlin", "implementationClassName": "HybridSystemControl" } },
+    "HybridMusicBridge": { "android": { "language": "kotlin", "implementationClassName": "HybridMusicBridge" } },
+    "HybridWeatherBridge": { "android": { "language": "kotlin", "implementationClassName": "HybridWeatherBridge" } },
+    "HybridCalendarBridge": { "android": { "language": "kotlin", "implementationClassName": "HybridCalendarBridge" } },
+    "HybridCameraRemote": { "android": { "language": "kotlin", "implementationClassName": "HybridCameraRemote" } },
+    "HybridGpsTracker": { "android": { "language": "kotlin", "implementationClassName": "HybridGpsTracker" } },
+    "HybridSedentary": { "android": { "language": "kotlin", "implementationClassName": "HybridSedentary" } },
+    "HybridWeatherProvider": { "android": { "language": "kotlin", "implementationClassName": "HybridWeatherProvider" } },
+    "HybridHealthConnect": { "android": { "language": "kotlin", "implementationClassName": "HybridHealthConnect" } }
   },
-  "ignorePaths": ["node_modules", "Gadgetbridge"]
+  "ignorePaths": ["node_modules", "vendor"]
 }

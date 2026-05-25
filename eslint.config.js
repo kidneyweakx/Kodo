@@ -5,7 +5,7 @@ module.exports = [
   {
     ignores: [
       'node_modules/**',
-      'Gadgetbridge/**',
+      'vendor/Gadgetbridge/**',
       'android/**',
       'ios/**',
       'dist/**',

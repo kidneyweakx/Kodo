@@ -1,6 +1,6 @@
 # 功能清單 / Feature Inventory — Mi Band 9 Active Slim
 
-> Source of truth: `Gadgetbridge/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/xiaomi/watches/MiBand9ActiveCoordinator.java` + `XiaomiCoordinator.java`.
+> Source of truth: `vendor/Gadgetbridge/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/xiaomi/watches/MiBand9ActiveCoordinator.java` + `XiaomiCoordinator.java`.
 >
 > 此瘦身版**只支援小米 Smart Band 9 Active**(藍牙廣播名稱 `Xiaomi Smart Band 9 Active XXXX`)。所有非此手環的程式碼路徑都不會帶進專案。
 >
@@ -165,7 +165,7 @@ Android 上 Fitbit/Samsung Health/Google Fit 都從 **Health Connect** 統一讀
 | Active calories | `HealthDailySummary.activeCalories` | `ActiveCaloriesBurnedRecord` |
 | Distance | `HealthDailySummary.distanceMeters` | `DistanceRecord` |
 
-Ported from `Gadgetbridge/app/src/main/java/.../util/healthconnect/` (Kotlin).
+Ported from `vendor/Gadgetbridge/app/src/main/java/.../util/healthconnect/` (Kotlin).
 
 ## 11. Excluded / 不做
 

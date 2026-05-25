@@ -19,7 +19,7 @@ Build matrix:
 
 | File | Mirrors upstream | Notes |
 |---|---|---|
-| `proto/xiaomi.proto` | `Gadgetbridge/.../proto/xiaomi.proto` | verbatim copy; `protoc` generates `XiaomiProto.java` |
+| `proto/xiaomi.proto` | `vendor/Gadgetbridge/.../proto/xiaomi.proto` | verbatim copy; `protoc` generates `XiaomiProto.java` |
 | `xiaomi/XiaomiWeatherConditions.kt` | `XiaomiWeatherConditions.java` | OWM → Xiaomi code mapping |
 | `xiaomi/XiaomiWorkoutType.kt` | `XiaomiWorkoutType.java` | first-class kinds + i18n keys |
 | `xiaomi/activity/XiaomiActivityFileId.kt` | `XiaomiActivityFileId.java` | 7-byte file id + nested Type/Subtype/DetailType |

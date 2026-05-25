@@ -1,5 +1,11 @@
-# --- Gadgetbridge upstream source tree (kept for reference, not part of our build) ---
-/Gadgetbridge/
+
+# --- upstream submodule artefacts (build output etc.) ---
+vendor/Gadgetbridge/app/build/
+vendor/Gadgetbridge/.gradle/
+vendor/Gadgetbridge/build/
+
+# --- nitrogen codegen output (regenerated on prebuild) ---
+nitrogen/generated/
 
 # --- node ---
 node_modules/

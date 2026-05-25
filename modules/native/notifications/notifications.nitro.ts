@@ -11,7 +11,7 @@
 
 import type { HybridObject } from 'react-native-nitro-modules';
 
-import type { NotificationPushRequest } from '@/modules/native/types';
+import type { NotificationPushRequest } from '../types';
 
 export interface NotificationFilter {
   readonly sourceId: string;

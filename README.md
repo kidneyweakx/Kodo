@@ -44,7 +44,7 @@ bun expo run:android        # device pair flow needs a real phone
 ├── libs/services/      # JS-side facades over Nitro modules
 ├── modules/native/     # Nitro HybridObject TS specs + Kotlin implementations
 ├── locales/            # zh-Hant / en
-├── Gadgetbridge/       # upstream source, kept as reference (gitignored)
+├── vendor/Gadgetbridge/       # upstream source, kept as reference (gitignored)
 ├── FEATURES.md
 ├── NOTICE.md
 ├── LICENSE             # AGPL-3.0-or-later

@@ -12,18 +12,18 @@
 import { NitroModules } from 'react-native-nitro-modules';
 import type { HybridObject } from 'react-native-nitro-modules';
 
-import type { HybridBandLink } from '@/modules/native/bandLink/spec';
-import type { HybridCalendarBridge } from '@/modules/native/calendar/spec';
-import type { HybridCameraRemote } from '@/modules/native/cameraRemote/spec';
-import type { HybridGpsTracker } from '@/modules/native/gps/spec';
-import type { HybridHealthConnect } from '@/modules/native/healthConnect/spec';
-import type { HybridHealthStore } from '@/modules/native/health/spec';
-import type { HybridMusicBridge } from '@/modules/native/music/spec';
-import type { HybridNotificationBridge } from '@/modules/native/notifications/spec';
-import type { HybridSedentary } from '@/modules/native/sedentary/spec';
-import type { HybridSystemControl } from '@/modules/native/system/spec';
-import type { HybridWeatherBridge } from '@/modules/native/weather/spec';
-import type { HybridWeatherProvider } from '@/modules/native/weatherProvider/spec';
+import type { HybridBandLink } from '@/modules/native/bandLink/bandLink.nitro';
+import type { HybridCalendarBridge } from '@/modules/native/calendar/calendar.nitro';
+import type { HybridCameraRemote } from '@/modules/native/cameraRemote/cameraRemote.nitro';
+import type { HybridGpsTracker } from '@/modules/native/gps/gps.nitro';
+import type { HybridHealthConnect } from '@/modules/native/healthConnect/healthConnect.nitro';
+import type { HybridHealthStore } from '@/modules/native/health/health.nitro';
+import type { HybridMusicBridge } from '@/modules/native/music/music.nitro';
+import type { HybridNotificationBridge } from '@/modules/native/notifications/notifications.nitro';
+import type { HybridSedentary } from '@/modules/native/sedentary/sedentary.nitro';
+import type { HybridSystemControl } from '@/modules/native/system/system.nitro';
+import type { HybridWeatherBridge } from '@/modules/native/weather/weather.nitro';
+import type { HybridWeatherProvider } from '@/modules/native/weatherProvider/weatherProvider.nitro';
 
 const lazyHybrid = <T extends HybridObject<{ android: 'kotlin' }>>(name: string) => {
   let instance: T | null = null;
@@ -62,7 +62,7 @@ export type {
 };
 
 export * from '@/modules/native/types';
-export type { GpsSample, WorkoutType } from '@/modules/native/gps/spec';
-export type { SedentaryConfig } from '@/modules/native/sedentary/spec';
-export type { OwmConfig } from '@/modules/native/weatherProvider/spec';
-export type { HealthConnectKind, HealthConnectStatus } from '@/modules/native/healthConnect/spec';
+export type { GpsSample, WorkoutType } from '@/modules/native/gps/gps.nitro';
+export type { SedentaryConfig } from '@/modules/native/sedentary/sedentary.nitro';
+export type { OwmConfig } from '@/modules/native/weatherProvider/weatherProvider.nitro';
+export type { HealthConnectKind, HealthConnectStatus } from '@/modules/native/healthConnect/healthConnect.nitro';

@@ -20,5 +20,5 @@
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
   ],
-  "exclude": ["node_modules", "Gadgetbridge", "android", "ios", "dist"]
+  "exclude": ["node_modules", "vendor", "android", "ios", "dist", "nitrogen/generated"]
 }

@@ -10,7 +10,7 @@
 
 import type { HybridObject } from 'react-native-nitro-modules';
 
-import type { MusicNowPlaying } from '@/modules/native/types';
+import type { MusicNowPlaying } from '../types';
 
 export type MusicCommand = 'play' | 'pause' | 'next' | 'previous' | 'volumeUp' | 'volumeDown';
 

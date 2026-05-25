@@ -21,7 +21,7 @@ import type {
   DiscoveredBand,
   HealthDailySummary,
   PairedBand,
-} from '@/modules/native/types';
+} from '../types';
 
 export interface BandLinkScanOptions {
   /** ms, default 12000. Long scans cost battery; we keep it under 15s. */
@@ -69,11 +69,11 @@ export interface HybridBandLink
    * "Sleep", ...) and `progress` is 0..1. Used to drive the dashboard's
    * live sync banner. Fires on the same dispatch as native sync I/O.
    */
-  onSyncProgress(
-    listener: (event: {
-      readonly phase: string;
-      readonly progress: number;
-      readonly startedAt: number;
-    }) => void,
-  ): () => void;
+  onSyncProgress(listener: (event: SyncProgress) => void): () => void;
+}
+
+export interface SyncProgress {
+  readonly phase: string;
+  readonly progress: number;
+  readonly startedAt: number;
 }

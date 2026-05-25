@@ -1,0 +1,4 @@
+[submodule "vendor/Gadgetbridge"]
+	path = vendor/Gadgetbridge
+	url = https://codeberg.org/Freeyourgadget/Gadgetbridge.git
+	branch = master

@@ -77,6 +77,15 @@ export interface BatteryInfo {
   readonly updatedAt: string;
 }
 
+export type NotificationCategory =
+  | 'message'
+  | 'call'
+  | 'mail'
+  | 'calendar'
+  | 'social'
+  | 'system'
+  | 'other';
+
 export interface NotificationPushRequest {
   /** Package id on Android. App bundle id on iOS. */
   readonly sourceId: string;
@@ -85,14 +94,7 @@ export interface NotificationPushRequest {
   readonly body: string;
   /** Unix epoch ms. */
   readonly postedAt: number;
-  readonly category:
-    | 'message'
-    | 'call'
-    | 'mail'
-    | 'calendar'
-    | 'social'
-    | 'system'
-    | 'other';
+  readonly category: NotificationCategory;
   /** Base64 PNG, optional. Implementation downscales to 24x24 before send. */
   readonly iconBase64?: string;
 }
@@ -115,16 +117,18 @@ export interface WeatherDailyForecast {
   readonly conditionCode: number;
 }
 
+export interface WeatherCurrent {
+  readonly tempC: number;
+  readonly conditionCode: number;
+  readonly humidity: number;
+  readonly aqi: number;
+}
+
 export interface WeatherPushRequest {
   readonly locationName: string;
   readonly latitude: number;
   readonly longitude: number;
-  readonly current: {
-    readonly tempC: number;
-    readonly conditionCode: number;
-    readonly humidity: number;
-    readonly aqi: number | null;
-  };
+  readonly current: WeatherCurrent;
   readonly daily: readonly WeatherDailyForecast[];
 }
 

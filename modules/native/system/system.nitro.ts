@@ -15,12 +15,13 @@
 import type { HybridObject } from 'react-native-nitro-modules';
 
 export type DisplayLanguage = 'zh-Hant' | 'en';
+export type HeartRateInterval = 'off' | '1m' | '10m' | '30m';
 
 export interface BandPreferenceSnapshot {
   readonly language: DisplayLanguage;
   readonly use24HourClock: boolean;
   readonly heartRateRealtime: boolean;
-  readonly heartRateInterval: 'off' | '1m' | '10m' | '30m';
+  readonly heartRateInterval: HeartRateInterval;
   readonly stepGoal: number;
 }
 
@@ -35,5 +36,5 @@ export interface HybridSystemControl
   syncClock(): Promise<void>;
 
   getPreferences(): BandPreferenceSnapshot;
-  setPreferences(prefs: Partial<BandPreferenceSnapshot>): Promise<BandPreferenceSnapshot>;
+  setPreferences(prefs: BandPreferenceSnapshot): Promise<BandPreferenceSnapshot>;
 }

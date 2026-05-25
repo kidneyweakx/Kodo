@@ -17,7 +17,7 @@ import type {
   HeartRateSample,
   SleepSegment,
   StressSample,
-} from '@/modules/native/types';
+} from '../types';
 
 export interface HybridHealthStore
   extends HybridObject<{ android: 'kotlin' }> {

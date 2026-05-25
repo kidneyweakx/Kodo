@@ -47,7 +47,7 @@
     "eslint": "^9.18.0",
     "eslint-config-expo": "~9.2.0",
     "eslint-plugin-react": "^7.37.4",
-    "nitro-codegen": "^0.29.4",
+    "nitrogen": "^0.35.7",
     "prettier": "^3.4.2",
     "typescript": "~5.9.2"
   },

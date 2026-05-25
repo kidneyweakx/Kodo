@@ -10,7 +10,7 @@
 
 import type { HybridObject } from 'react-native-nitro-modules';
 
-import type { CalendarEventPush } from '@/modules/native/types';
+import type { CalendarEventPush } from '../types';
 
 export interface HybridCalendarBridge
   extends HybridObject<{ android: 'kotlin' }> {
