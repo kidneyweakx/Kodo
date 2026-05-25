@@ -1,94 +1,80 @@
-# STATUS — what actually works right now
+# STATUS
 
 Generated: 2026-05-26
 
-## ✅ Builds end-to-end
+## ✅ Mi Band 9 Active feature wiring — every Hybrid sends/receives real protobuf
 
 ```bash
-bun install
-git submodule update --init     # pulls upstream Gadgetbridge (read-only reference)
+bun install && git submodule update --init
 bun expo prebuild --platform android --no-install --clean
-bunx nitrogen                   # generates 12 Hybrid Kotlin + C++ specs
+bunx nitrogen
 cd android && ./gradlew :app:assembleDebug
-# → BUILD SUCCESSFUL, ~238 MB debug APK at android/app/build/outputs/apk/debug/app-debug.apk
+# → BUILD SUCCESSFUL — debug APK at android/app/build/outputs/apk/debug/app-debug.apk (~238 MB)
 ```
 
-## ✅ Nitro fully wired
+Every Hybrid below now calls `MiBand9BleDriver.sendCommand(XiaomiProto.Command)` and/or subscribes to `driver.incoming` / `driver.activityChunks`. Driver instance is shared via `com.kidneyweakx.miband9active.DriverHolder` — `HybridBandLink.pair()`/`connect()` set it, `forget()` clears it.
 
-12 `*.nitro.ts` specs → `nitrogen` → 12 `HybridHybrid<Foo>Spec.kt` abstract classes → 12 Kotlin implementations under `com.margelo.nitro.miband9active.Hybrid<Foo>`. JS calls `NitroModules.createHybridObject<HybridBandLink>('HybridBandLink')` and gets a real Kotlin instance over JSI.
+| Feature (FEATURES.md) | Hybrid | Engine call | Status |
+|---|---|---|---|
+| BLE scan / pair / auth (V2) | `HybridBandLink` | `MiBand9BleDriver.connect` + auth handshake | ✅ scan→pair→encrypted session |
+| **Sync HR / SpO₂ / Stress / Sleep / Steps / kcal / dist** | `HybridBandLink.syncSince` | `Health(8,2)` request → `activityChunks` → `XiaomiActivityFileFetcher` → parsers → `SampleStore` | ✅ end-to-end |
+| Read persisted samples | `HybridHealthStore` | `SampleStore.load*` | ✅ |
+| Notification access permission | `HybridNotificationBridge` | `Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS` | ✅ |
+| Notification filter / DnD mirror | `HybridNotificationBridge` | SharedPreferences + `MiBand9NotificationListener` | ✅ |
+| **Notification push to band** | `HybridNotificationBridge.push` | `Notification(7,0)` with `Notification3` payload | ✅ also auto-forwarded from system NLS |
+| **Find phone (band → phone)** | observed via `driver.incoming` | filter `SystemCommands.CMD_FIND_PHONE` | ✅ (JS owns audio side) |
+| **Clock sync** | `HybridSystemControl.syncClock` | `System(2,3)` with Date+Time+TimeZone | ✅ |
+| **Language push** | `HybridSystemControl.setPreferences` | `System(2,6)` with `Language` | ✅ |
+| **Camera shutter** | `HybridCameraRemote.arm/disarm/onShutter` | `System(2,8)` enable + listen `driver.incoming` | ✅ |
+| **GPS push to band during workout** | `HybridGpsTracker.startWorkout` | `Health(8,48)` `WorkoutLocation` on every fix | ✅ |
+| GPS foreground service | `MiBand9GpsService` | location\|connectedDevice fg | ✅ |
+| **Weather push** | `HybridWeatherBridge.push` | `Weather(10,0)` with `WeatherCurrent` | ✅ current-only |
+| Third-party weather intake | `HybridWeatherProvider` | `ACTION_GENERIC_WEATHER` broadcast | ✅ |
+| **Calendar push** | `HybridCalendarBridge.pushEvents/clearEvents` | `Calendar(12,0)` with `CalendarSync` | ✅ |
+| **Music now-playing push** | `HybridMusicBridge.pushNowPlaying` | `Music(18,0)` with `MusicInfo` | ✅ |
+| **Music control buttons (band → phone)** | `HybridMusicBridge.onCommand` | filter `Music(18,1)` in `driver.incoming` | ✅ |
+| **Sedentary reminder** | `HybridSedentary.set` | `Health(8,29)` + SharedPreferences | ✅ |
+| **Fitbit / Samsung Health / Google Fit export** | `HybridHealthConnect.exportDay` | `SampleStore` → `HealthConnectExporter` → HC client | ✅ |
+| Find band (phone → band ring) | — | — | ❌ Mi Band 9 Active hardware doesn't support (`MiBand9ActiveCoordinator.supportsFindDevice=false`) |
+| Watchface install | — | — | post-MVP |
 
-| Hybrid spec | Kotlin impl | Engine wired |
-|---|---|---|
-| `HybridBandLink` | `HybridBandLink.kt` | ✅ `MiBand9BleDriver` (scan / pair / connect / GATT / V2 framing / auth). `syncSince` is the only TODO. |
-| `HybridHealthStore` | `HybridHealthStore.kt` | TODO (needs MMKV read of persisted samples) |
-| `HybridNotificationBridge` | `HybridNotificationBridge.kt` | ✅ `MiBand9NotificationListener` + SharedPreferences for allow-list and DnD mirror |
-| `HybridSystemControl` | `HybridSystemControl.kt` | In-memory prefs; band push pending the driver |
-| `HybridMusicBridge` | `HybridMusicBridge.kt` | Stub |
-| `HybridWeatherBridge` | `HybridWeatherBridge.kt` | Stub (will call `driver.sendCommand`) |
-| `HybridCalendarBridge` | `HybridCalendarBridge.kt` | Stub |
-| `HybridCameraRemote` | `HybridCameraRemote.kt` | Stub (arm/disarm flag; shutter event TBD) |
-| `HybridGpsTracker` | `HybridGpsTracker.kt` | ✅ `MiBand9GpsService` (foreground location\|connectedDevice) |
-| `HybridSedentary` | `HybridSedentary.kt` | In-memory config |
-| `HybridWeatherProvider` | `HybridWeatherProvider.kt` | ✅ `GenericWeatherReceiver` (broadcast bridge for Breezy / GBWeather / OWMW / Samsung-via-Tasker) + SharedPreferences for OWM config |
-| `HybridHealthConnect` | `HybridHealthConnect.kt` | ✅ `HealthConnectExporter` (HR / SpO₂ / Steps / SleepSession) — Fitbit / Samsung Health / Google Fit read from this |
+## ✅ Engine layer (Gadgetbridge → Kotlin)
+
+| Area | File |
+|---|---|
+| Protobuf schema | `android-port/src/main/proto/xiaomi.proto` (verbatim) → auto-generated `XiaomiProto.java` |
+| Conditions / Workout types | `xiaomi/XiaomiWeatherConditions.kt`, `xiaomi/XiaomiWorkoutType.kt` |
+| Activity file id / parsers | `xiaomi/activity/XiaomiActivityFileId.kt`, `XiaomiComplexActivityParser.kt`, `XiaomiActivitySample.kt`, `DailyDetailsParser.kt`, `SleepStagesParser.kt`, `XiaomiActivityFileFetcher.kt` |
+| Crypto + auth | `xiaomi/auth/XiaomiCrypto.kt`, `XiaomiAuthSession.kt` |
+| V1 + V2 protocol | `xiaomi/protocol/XiaomiUuids.kt`, `XiaomiCharacteristicV1.kt`, `XiaomiSppPacketV2.kt`, `V2PacketAccumulator.kt`, `MiBand9BleDriver.kt` |
+| Notification + icon | `xiaomi/notifications/IconConverter.kt`, `MiBand9NotificationListener.kt` |
+| Weather receiver | `xiaomi/services/GenericWeatherReceiver.kt` |
+| Wire command IDs | `xiaomi/services/SystemCommands.kt` |
+| GPS workout service | `gps/MiBand9GpsService.kt` |
+| Storage / context | `AppContext.kt`, `SampleStore.kt`, `DriverHolder.kt` |
+| Health Connect writer | `healthconnect/HealthConnectExporter.kt` |
+
+## ✅ Nitro wiring
+
+12/12 `.nitro.ts` → `bunx nitrogen` → 12 generated abstract `HybridHybrid<X>Spec` → 12 Kotlin impls under `com.margelo.nitro.miband9active.Hybrid<X>`.
+
+JS facades in `libs/services/*.ts` use `NitroModules.createHybridObject<T>('Hybrid<X>')`. C++ JNI + Kotlin class registration generated automatically; native CMake target `MiBand9ActiveNitro` builds for all four ABIs.
 
 ## ✅ Build matrix
 
-- minSdk **26** (Health Connect requirement), compileSdk **36**, targetSdk **35**
-- Kotlin **2.1.20** (Expo modules requirement), Gradle 9.3.1
+- minSdk 26 / compileSdk 36 / targetSdk 35 / Kotlin 2.1.20
 - Expo SDK 56.0.4, RN 0.85.3, Reanimated 4.3.1
-- Nitro Modules **0.35.7** + Nitrogen **0.35.7** (auto-codegen via `bunx nitrogen`)
+- Nitro Modules 0.35.7 + Nitrogen 0.35.7
 - BouncyCastle 1.78.1, protobuf-javalite 3.25.5, kotlinx-coroutines 1.9.0, androidx.health.connect 1.1.0-rc02
+- WorkManager runtime 2.10.0
 
-## ✅ Engine layer (Kotlin port of Gadgetbridge) — all compile
+## ⏳ Genuine remaining gaps
 
-| Area | File | Mirrors upstream |
-|---|---|---|
-| Protobuf schema | `android-port/src/main/proto/xiaomi.proto` | verbatim |
-| Generated proto Java | `XiaomiProto.java` (auto, ~50 k LOC) | upstream same |
-| Conditions enum | `XiaomiWeatherConditions.kt` | `XiaomiWeatherConditions.java` |
-| Workout types | `XiaomiWorkoutType.kt` | `XiaomiWorkoutType.java` |
-| Activity file id | `xiaomi/activity/XiaomiActivityFileId.kt` | `XiaomiActivityFileId.java` |
-| Bit-packed sample reader | `XiaomiComplexActivityParser.kt` | upstream same |
-| Sample data class | `XiaomiActivitySample.kt` | upstream minus DAO |
-| Daily details parser | `DailyDetailsParser.kt` | upstream minus DB |
-| Sleep stages parser | `SleepStagesParser.kt` | upstream minus DB |
-| Activity file fetcher | `XiaomiActivityFileFetcher.kt` | upstream slim |
-| AES-CCM / CTR / HMAC | `xiaomi/auth/XiaomiCrypto.kt` | `XiaomiAuthService.java` (crypto) |
-| Auth session holder | `XiaomiAuthSession.kt` | upstream fields encapsulated |
-| Mi Band 9 Active UUIDs | `xiaomi/protocol/XiaomiUuids.kt` | filtered subset |
-| V1 char (chunk + retry) | `XiaomiCharacteristicV1.kt` | `XiaomiCharacteristicV1.java` |
-| V2 packet framing | `XiaomiSppPacketV2.kt` | `XiaomiSppPacketV2.java` (sealed-class rewrite) |
-| V2 buffer accumulator | `V2PacketAccumulator.kt` | upstream `processBuffer` |
-| GATT + V2 + auth driver | `MiBand9BleDriver.kt` | new (replaces `XiaomiBleProtocolV2` + GBDevice scaffold) |
-| Icon downscale | `xiaomi/notifications/IconConverter.kt` | `XiaomiBitmapUtils.java` (slim) |
-| NLS listener | `MiBand9NotificationListener.kt` | upstream `NotificationListener.java` |
-| Weather receiver | `xiaomi/services/GenericWeatherReceiver.kt` | upstream |
-| Command constants | `xiaomi/services/SystemCommands.kt` | upstream constants |
-| Workout GPS service | `gps/MiBand9GpsService.kt` | new |
-| App context holder | `AppContext.kt` + `InitializerProvider` | new |
-| Health Connect writer | `healthconnect/HealthConnectExporter.kt` | inspired by upstream |
-
-## ✅ Build wiring (Expo config plugins)
-
-| Plugin | Job |
+| Item | Why it's not "done" |
 |---|---|
-| `expo-build-properties` | minSdk 26 / compileSdk 36 / kotlin 2.1.20 |
-| `plugins/with-project-build-gradle.js` | protobuf-gradle-plugin classpath |
-| `plugins/with-android-port.js` | source sets (android-port + nitrogen) + Bouncycastle / protobuf-javalite / coroutines / HealthConnect / WorkManager + protobuf plugin |
-| `plugins/with-manifest.js` | `InitializerProvider`, `MiBand9NotificationListener`, `MiBand9GpsService` (foregroundServiceType=location\|connectedDevice), `GenericWeatherReceiver` |
+| Watchface install (`XiaomiInstallHandler` + `XiaomiWatchfaceService`) | Large secondary feature; deferred post-MVP |
+| WorkManager periodic 30-min sync worker | Defined in docs/POWER.md but the Worker class itself isn't authored — JS-side `bandLink.syncSince` is the manual path |
+| Notification icon → band: `IconConverter` exists but `push()` doesn't yet attach the 24×24 bitmap | TLV slot in proto is `Notification3.unknown4`; need to confirm field semantics before shipping |
+| Activity-fetch "done" signal | We currently use a 15 s grace timeout; upstream Gadgetbridge listens for a specific reply we haven't fully mapped yet |
 
-## ⏳ What's still TODO
-
-| Slice | Why deferred |
-|---|---|
-| `HybridBandLink.syncSince` — orchestrate `XiaomiActivityFileFetcher` over `driver.activityChunks` + replay `XiaomiHealthService.fetch_activity_file` commands | parser + driver both exist; needs the loop |
-| `HybridHealthStore` MMKV read | depends on sync loop above |
-| Wire `HybridSystemControl` (clock / find-phone / preferences) through `driver.sendCommand` | mechanical after the driver runs on real hardware |
-| Wire `HybridMusicBridge` to `MediaSessionManager` + driver commands | same |
-| `HybridWeatherBridge.push` → `driver.sendCommand` with weather payload | same |
-| `HybridCalendarBridge.pushEvents` → `driver.sendCommand` | same |
-| `HybridCameraRemote.onShutter` → subscribe to `driver.incoming` (`SystemCommands.CMD_CAMERA_REMOTE_SET`) | same |
-| Watchface install (`XiaomiInstallHandler`, `XiaomiWatchfaceService`) | post-MVP |
-
-Each is one driver method call away — heavy lifting (BLE GATT, V2 framing, auth, protobuf) is done.
+Everything else from `FEATURES.md` is reachable end-to-end through `NitroModules.createHybridObject(...)` from JS.
