@@ -15,6 +15,7 @@ import Animated, {
   interpolate,
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -51,6 +52,8 @@ export function SyncStatusBar() {
   const status = useSyncStatus();
   const progress = useSharedValue(0);
   const visible = useSharedValue(0);
+  const scan = useSharedValue(0);
+  const dotPulse = useSharedValue(0);
 
   const isSyncing = status.phase !== 'idle' && status.phase !== 'error';
   const isError = status.phase === 'error';
@@ -65,12 +68,42 @@ export function SyncStatusBar() {
     });
   }, [progress, visible, status.progress, isSyncing, isError]);
 
+  useEffect(() => {
+    if (isSyncing) {
+      scan.value = withRepeat(
+        withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.cubic) }),
+        -1,
+        false,
+      );
+      dotPulse.value = withRepeat(
+        withTiming(1, { duration: 900, easing: Easing.inOut(Easing.cubic) }),
+        -1,
+        true,
+      );
+    } else {
+      scan.value = withTiming(0, { duration: Motion.duration.base });
+      dotPulse.value = withTiming(0, { duration: Motion.duration.base });
+    }
+  }, [scan, dotPulse, isSyncing]);
+
   const barStyle = useAnimatedStyle(() => ({
     width: `${interpolate(progress.value, [0, 1], [0, 100])}%`,
   }));
 
   const wrapperStyle = useAnimatedStyle(() => ({
     opacity: visible.value,
+  }));
+
+  // Scanning beam — sweeps from -20% to 100% of bar width while syncing.
+  const scanStyle = useAnimatedStyle(() => ({
+    left: `${interpolate(scan.value, [0, 1], [-20, 100])}%`,
+    opacity: isSyncing ? 0.55 : 0,
+  }));
+
+  // Pulsing dot — radial halo behind the status indicator.
+  const dotHaloStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 + dotPulse.value * 1.4 }],
+    opacity: 0.55 - dotPulse.value * 0.55,
   }));
 
   const onTap = async () => {
@@ -118,6 +151,21 @@ export function SyncStatusBar() {
             barStyle,
           ]}
         />
+        {/* Scanning beam while syncing — pure transform animation, native driver. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            {
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              width: 60,
+              backgroundColor: accent,
+              opacity: 0,
+            },
+            scanStyle,
+          ]}
+        />
         <View
           style={{
             width: 8,
@@ -125,7 +173,20 @@ export function SyncStatusBar() {
             borderRadius: 4,
             backgroundColor: isSyncing ? accent : isError ? theme.danger : theme.success,
           }}
-        />
+        >
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              {
+                position: 'absolute',
+                inset: -3,
+                borderRadius: 7,
+                backgroundColor: accent,
+              },
+              dotHaloStyle,
+            ]}
+          />
+        </View>
         <View style={{ flex: 1 }}>
           <ThemedText variant="caption" tone="secondary" style={{ letterSpacing: 1 }}>
             {isSyncing

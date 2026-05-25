@@ -11,7 +11,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { ThemedButton, ThemedSurface, ThemedText } from '@/components/themed';
 import { OnboardingScaffold } from '@/components/onboarding/OnboardingScaffold';
-import { AppLogo } from '@/components/brand/AppLogo';
+import { LogoLockup } from '@/components/brand/LogoLockup';
 import { Spacing } from '@/constants/DesignSystem';
 import { useTheme } from '@/context/ThemeContext';
 import { t } from '@/libs/services/i18n';
@@ -35,23 +35,26 @@ export default function WelcomeScreen() {
         />
       }
     >
-      <Animated.View entering={FadeIn.duration(560).delay(180)} style={{ flex: 1, justifyContent: 'center', gap: Spacing.xl }}>
-        <View style={{ alignItems: 'center' }}>
-          <AppLogo size={140} />
-        </View>
+      <Animated.View
+        entering={FadeIn.duration(560).delay(120)}
+        style={{ flex: 1, justifyContent: 'center', gap: Spacing.xxl }}
+      >
+        <LogoLockup tagline="一支手環,一個專屬伴侶。" size={132} />
+
         <ThemedSurface variant="elevated" padded="xl" style={{ gap: Spacing.lg }}>
-          <View style={{ flexDirection: 'row', gap: Spacing.lg, alignItems: 'center' }}>
-            <View style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: theme.accent }} />
-            <ThemedText variant="titleMedium">本機儲存 · 不上雲 / Local first</ThemedText>
-          </View>
-          <View style={{ flexDirection: 'row', gap: Spacing.lg, alignItems: 'center' }}>
-            <View style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: theme.success }} />
-            <ThemedText variant="titleMedium">省電優化 · 不常駐 / Battery-aware sync</ThemedText>
-          </View>
-          <View style={{ flexDirection: 'row', gap: Spacing.lg, alignItems: 'center' }}>
-            <View style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: theme.secondary }} />
-            <ThemedText variant="titleMedium">只支援 Mi Band 9 Active · 專一</ThemedText>
-          </View>
+          {[
+            { color: theme.accent, label: '本機儲存 · 不上雲 / Local first' },
+            { color: theme.success, label: '省電優化 · 不常駐 / Battery-aware' },
+            { color: theme.secondary, label: '只支援 Mi Band 9 Active · 專一' },
+          ].map((row) => (
+            <View
+              key={row.label}
+              style={{ flexDirection: 'row', gap: Spacing.lg, alignItems: 'center' }}
+            >
+              <View style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: row.color }} />
+              <ThemedText variant="titleMedium">{row.label}</ThemedText>
+            </View>
+          ))}
         </ThemedSurface>
       </Animated.View>
     </OnboardingScaffold>
