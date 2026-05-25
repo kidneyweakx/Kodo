@@ -38,6 +38,7 @@ module.exports = [
       'context/ThemeContext.tsx',
       'components/themed/contrast.ts',
       'constants/DesignSystem.ts',
+      'components/brand/**',
     ],
     rules: {
       'no-restricted-syntax': 'off',
