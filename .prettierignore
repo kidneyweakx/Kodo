@@ -1,0 +1,8 @@
+node_modules
+Gadgetbridge
+android
+ios
+dist
+.expo
+bun.lock
+LICENSE
