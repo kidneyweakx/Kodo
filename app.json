@@ -36,6 +36,17 @@
       }
     },
     "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26,
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 35,
+            "kotlinVersion": "2.1.20"
+          }
+        }
+      ],
       "./plugins/with-project-build-gradle.js",
       "./plugins/with-android-port.js",
       "expo-router",

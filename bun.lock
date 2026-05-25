@@ -7,6 +7,7 @@
       "dependencies": {
         "expo": "~56.0.4",
         "expo-blur": "~56.0.3",
+        "expo-build-properties": "^56.0.14",
         "expo-font": "~56.0.5",
         "expo-haptics": "~56.0.3",
         "expo-image": "~56.0.9",
@@ -786,6 +787,8 @@
     "expo-asset": ["expo-asset@56.0.14", "", { "dependencies": { "@expo/image-utils": "^0.10.1", "expo-constants": "~56.0.15" }, "peerDependencies": { "expo": "*", "react": "*", "react-native": "*" } }, "sha512-3rN/VGt4jhNOXbAz3gdSJzC/dSmX5ozHgtG/HQTCOzuRGBd1q2lzWoZewX8aU1fiWchQg9LasiLiAJi+u8oBbQ=="],
 
     "expo-blur": ["expo-blur@56.0.3", "", { "peerDependencies": { "expo": "*", "react": "*", "react-native": "*" } }, "sha512-KDDtrpWc2tYlm1WCPaOgBtv+YEGqe5ELheFPIgSNgHt28NQUDcfBcFsA9Us2StDh6osmSD6NbKxOt5bU6PcDbQ=="],
+
+    "expo-build-properties": ["expo-build-properties@56.0.14", "", { "dependencies": { "@expo/schema-utils": "^56.0.0", "resolve-from": "^5.0.0", "semver": "^7.6.0" }, "peerDependencies": { "expo": "*" } }, "sha512-4jn7uQuwgRxdvwEaQ+rU5TgqWZjgO9Cuw4MLTNa4Mx3YAruU83YlCCToZwidrfNV9OntPGp/ftGe+ahPT4Vh0Q=="],
 
     "expo-constants": ["expo-constants@56.0.15", "", { "dependencies": { "@expo/env": "~2.3.0" }, "peerDependencies": { "expo": "*", "react-native": "*" } }, "sha512-7187sd55swLX+CM0noAV5LreEgkUaDG/zEXy9quonfzKpJxy8zJAszp9S++xOx/FcqBVEEEcQhE8tKTujwL8fg=="],
 
@@ -1640,6 +1643,8 @@
     "eslint-module-utils/debug": ["debug@3.2.7", "", { "dependencies": { "ms": "^2.1.1" } }, "sha512-CFjzYYAi4ThfiQvizrFQevTTXHtnCqWfe7x1AhgEscTz6ZbLbfoLRLPugTQyBth6f8ZERVUSyWHFD/7Wu4t1XQ=="],
 
     "eslint-plugin-import/debug": ["debug@3.2.7", "", { "dependencies": { "ms": "^2.1.1" } }, "sha512-CFjzYYAi4ThfiQvizrFQevTTXHtnCqWfe7x1AhgEscTz6ZbLbfoLRLPugTQyBth6f8ZERVUSyWHFD/7Wu4t1XQ=="],
+
+    "expo-build-properties/semver": ["semver@7.8.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-rkVq3IXh+4FDGch+KwzX3aV9W3kO54GyEgpvBzSyctDA6Xtd7RJQV1xmXbeQp5v7+VzLOfVqiutSE6GICgPFvg=="],
 
     "expo-modules-autolinking/commander": ["commander@7.2.0", "", {}, "sha512-QrWXB+ZQSVPmIWIhtEO9H+gwHaMGYiF5ChvoJ+K9ZGHG/sVsa6yiesAD1GC/x46sET00Xlwo1u49RVVVzvcSkw=="],
 
