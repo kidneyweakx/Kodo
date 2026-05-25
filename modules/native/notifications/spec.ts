@@ -20,7 +20,7 @@ export interface NotificationFilter {
 }
 
 export interface HybridNotificationBridge
-  extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
+  extends HybridObject<{ android: 'kotlin' }> {
   readonly notificationAccessGranted: boolean;
 
   /** Opens system settings screen for notification listener access. */

@@ -14,6 +14,6 @@ import type { HybridObject } from 'react-native-nitro-modules';
 import type { WeatherPushRequest } from '@/modules/native/types';
 
 export interface HybridWeatherBridge
-  extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
+  extends HybridObject<{ android: 'kotlin' }> {
   push(request: WeatherPushRequest): Promise<void>;
 }

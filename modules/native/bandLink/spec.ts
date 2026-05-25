@@ -34,7 +34,7 @@ export interface BandLinkPairOptions {
 }
 
 export interface HybridBandLink
-  extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
+  extends HybridObject<{ android: 'kotlin' }> {
   // ----- state -----
   readonly connectionState: ConnectionState;
   readonly currentBand: PairedBand | null;

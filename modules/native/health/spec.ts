@@ -20,7 +20,7 @@ import type {
 } from '@/modules/native/types';
 
 export interface HybridHealthStore
-  extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
+  extends HybridObject<{ android: 'kotlin' }> {
   getDailySummary(dateIso: string): HealthDailySummary | null;
   getDailySummariesRange(fromIso: string, toIso: string): readonly HealthDailySummary[];
 

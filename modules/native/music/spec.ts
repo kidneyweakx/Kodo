@@ -15,7 +15,7 @@ import type { MusicNowPlaying } from '@/modules/native/types';
 export type MusicCommand = 'play' | 'pause' | 'next' | 'previous' | 'volumeUp' | 'volumeDown';
 
 export interface HybridMusicBridge
-  extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
+  extends HybridObject<{ android: 'kotlin' }> {
   pushNowPlaying(snapshot: MusicNowPlaying): void;
   /** Fires when band-side button commands need to be relayed to OS media controls. */
   onCommand(listener: (command: MusicCommand) => void): () => void;

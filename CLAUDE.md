@@ -2,6 +2,10 @@
 
 A slim Mi Band 9 Active companion app built on **Expo SDK 56 + RN 0.85 + Reanimated 4 + Nitro Modules**. AGPL-3.0-or-later because we port from [Gadgetbridge](https://codeberg.org/Freeyourgadget/Gadgetbridge).
 
+**Platform**: Android only. We do not build, ship, or test on iOS. `app.json` declares `"platforms": ["android"]` and Nitro specs only declare a `kotlin` target. Do not re-add Swift.
+
+**Background work is power-budget gated.** See `docs/POWER.md` — the rules there are not suggestions. No foreground service outside an active sync, no WAKE_LOCK, no background-location, periodic interval ≥ 30 min, realtime HR off by default.
+
 See `FEATURES.md` for the full feature scope. See `NOTICE.md` for upstream attribution.
 
 ## Project layout

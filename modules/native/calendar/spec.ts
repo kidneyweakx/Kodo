@@ -13,7 +13,7 @@ import type { HybridObject } from 'react-native-nitro-modules';
 import type { CalendarEventPush } from '@/modules/native/types';
 
 export interface HybridCalendarBridge
-  extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
+  extends HybridObject<{ android: 'kotlin' }> {
   pushEvents(events: readonly CalendarEventPush[]): Promise<void>;
   clearEvents(): Promise<void>;
 }

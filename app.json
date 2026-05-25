@@ -3,6 +3,7 @@
     "name": "Mi Band 9 Active",
     "slug": "mi-band-9-active",
     "version": "0.0.1",
+    "platforms": ["android"],
     "orientation": "portrait",
     "scheme": "miband9active",
     "userInterfaceStyle": "automatic",
@@ -13,14 +14,6 @@
       "resizeMode": "contain",
       "backgroundColor": "#0A0A0B"
     },
-    "ios": {
-      "bundleIdentifier": "gg.solidarity.miband9active",
-      "supportsTablet": false,
-      "infoPlist": {
-        "NSBluetoothAlwaysUsageDescription": "與你的小米手環 9 Active 連線以同步健康資料 / Connect to your Mi Band 9 Active to sync health data.",
-        "NSBluetoothPeripheralUsageDescription": "與你的小米手環 9 Active 連線以同步健康資料 / Connect to your Mi Band 9 Active to sync health data."
-      }
-    },
     "android": {
       "package": "gg.solidarity.miband9active",
       "permissions": [
@@ -29,13 +22,11 @@
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_BACKGROUND_LOCATION",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE",
         "android.permission.READ_PHONE_STATE",
-        "android.permission.WAKE_LOCK",
         "android.permission.VIBRATE"
       ],
       "adaptiveIcon": {

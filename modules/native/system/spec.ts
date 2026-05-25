@@ -25,7 +25,7 @@ export interface BandPreferenceSnapshot {
 }
 
 export interface HybridSystemControl
-  extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
+  extends HybridObject<{ android: 'kotlin' }> {
   /** Triggers the phone to ring even on silent. Called by the band. */
   ringPhone(): void;
   /** Stop ringing. */
