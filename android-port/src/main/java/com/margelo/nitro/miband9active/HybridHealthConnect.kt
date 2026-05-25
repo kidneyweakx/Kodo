@@ -32,10 +32,17 @@ class HybridHealthConnect : HybridHybridHealthConnectSpec() {
     }
 
     override fun exportDay(dateIso: String): Promise<Double> = Promise.async {
-        // The actual sample read needs HybridHealthStore + a paired band;
-        // when those are wired the export becomes a one-liner. For now,
-        // calling with no samples is a no-op.
-        0.0
+        val samples = com.kidneyweakx.miband9active.SampleStore.loadActivity(dateIso)
+        val (summary, stages) = com.kidneyweakx.miband9active.SampleStore.loadSleep(dateIso)
+        val written = HealthConnectExporter.exportDay(
+            context = AppContext.context,
+            bandName = "Mi Band 9 Active",
+            bandSerial = dateIso,
+            samples = samples,
+            sleepStages = stages,
+            sleepSummary = summary,
+        )
+        written.toDouble()
     }
 
     override fun revokeAndClear(): Promise<Unit> = Promise.async { Unit }

@@ -17,6 +17,7 @@ import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.os.ParcelUuid
 import com.kidneyweakx.miband9active.AppContext
+import com.kidneyweakx.miband9active.DriverHolder
 import com.kidneyweakx.miband9active.xiaomi.auth.XiaomiCrypto
 import com.kidneyweakx.miband9active.xiaomi.protocol.MiBand9BleDriver
 import com.kidneyweakx.miband9active.xiaomi.protocol.XiaomiUuids
@@ -115,6 +116,7 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
 
         val drv = MiBand9BleDriver(AppContext.context, authKey)
         driver = drv
+        DriverHolder.current = drv
         observeDriver(drv)
         drv.connect(device)
 
@@ -148,6 +150,7 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
         driver?.disconnect()
         driver?.close()
         driver = null
+        DriverHolder.current = null
         _band = null
         _battery = null
     }
@@ -160,6 +163,7 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
         val device = mgr.adapter?.getRemoteDevice(band.id) ?: return@async
         if (driver == null) {
             driver = MiBand9BleDriver(AppContext.context, authKey).also { observeDriver(it) }
+            DriverHolder.current = driver
         }
         driver!!.connect(device)
     }
@@ -169,10 +173,59 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
     }
 
     override fun syncSince(sinceIso: String): Promise<Double> = Promise.async {
-        // TODO: drive XiaomiActivityFileFetcher via driver.activityChunks and
-        //       replay XiaomiHealthService get-activity commands. Stub returns 0
-        //       so the JS side gets a deterministic answer.
-        0.0
+        val drv = driver ?: throw IllegalStateException("Not connected")
+        val fetcher = com.kidneyweakx.miband9active.xiaomi.activity.XiaomiActivityFileFetcher()
+        var filesParsed = 0
+
+        // 1) Subscribe to incoming activity chunks BEFORE sending the request
+        //    so we don't drop the first packet.
+        val collector = scope.launch {
+            drv.activityChunks.collect { chunk ->
+                fetcher.addChunk(chunk)
+                // Heuristic: when a chunk smaller than the MTU arrives we assume
+                // it was the tail of a file and try to parse.
+                val parsed = fetcher.finalizeFile() ?: return@collect
+                when (parsed) {
+                    is com.kidneyweakx.miband9active.xiaomi.activity.ParsedActivityFile.DailySamples -> {
+                        com.kidneyweakx.miband9active.SampleStore.persistActivity(parsed.samples)
+                        filesParsed++
+                    }
+                    is com.kidneyweakx.miband9active.xiaomi.activity.ParsedActivityFile.Sleep -> {
+                        val dayIso = parsed.fileId.timestamp.toInstant().toString().substring(0, 10)
+                        com.kidneyweakx.miband9active.SampleStore.persistSleep(dayIso, parsed.sleep.summary, parsed.sleep.stages)
+                        filesParsed++
+                    }
+                    is com.kidneyweakx.miband9active.xiaomi.activity.ParsedActivityFile.Unknown -> {
+                        // Drop — unknown subtype is not actionable.
+                    }
+                }
+            }
+        }
+
+        // 2) Ask the band for today's activity file list. The band then streams
+        //    chunks back on the ACTIVITY channel.
+        drv.sendCommand(
+            nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto.Command.newBuilder()
+                .setType(com.kidneyweakx.miband9active.xiaomi.services.HealthCommands.COMMAND_TYPE)
+                .setSubtype(2) // get today
+                .setHealth(
+                    nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto.Health.newBuilder()
+                        .setActivitySyncRequestToday(
+                            nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto.ActivitySyncRequestToday
+                                .newBuilder()
+                                .setUnknown1(0)
+                                .build(),
+                        ),
+                )
+                .build(),
+        )
+
+        // 3) Give the band up to 15 s to stream chunks back. Real "done"
+        //    signalling would come from the band's reply on the protobuf
+        //    channel; we treat 15 s of silence as completion.
+        kotlinx.coroutines.delay(15_000)
+        collector.cancel()
+        filesParsed.toDouble()
     }
 
     override fun fetchTodaySummary(): Promise<Variant_NullType_HealthDailySummary> = Promise.async {

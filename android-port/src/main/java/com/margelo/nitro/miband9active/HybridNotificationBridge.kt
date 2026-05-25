@@ -9,10 +9,16 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import com.kidneyweakx.miband9active.AppContext
+import com.kidneyweakx.miband9active.DriverHolder
 import com.kidneyweakx.miband9active.xiaomi.notifications.MiBand9NotificationListener
+import com.kidneyweakx.miband9active.xiaomi.services.NotificationCommands
 import com.margelo.nitro.core.Promise
+import java.util.concurrent.atomic.AtomicInteger
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto
 
 class HybridNotificationBridge : HybridHybridNotificationBridgeSpec() {
+
+    private val notifIdCounter = AtomicInteger(1)
 
     override val notificationAccessGranted: Boolean
         get() {
@@ -35,7 +41,27 @@ class HybridNotificationBridge : HybridHybridNotificationBridgeSpec() {
     }
 
     override fun push(request: NotificationPushRequest): Promise<Unit> = Promise.async {
-        // TODO: forward to band via HybridBandLink shared engine instance once wired.
+        val drv = DriverHolder.current ?: return@async
+        val isCall = request.category == NotificationCategory.CALL
+        val notif3 = XiaomiProto.Notification3.newBuilder()
+            .setPackage(request.sourceId)
+            .setAppName(request.appName)
+            .setTitle(request.title)
+            .setBody(request.body)
+            .setTimestamp(java.time.Instant.ofEpochMilli(request.postedAt.toLong()).toString())
+            .setId(notifIdCounter.getAndIncrement())
+            .setIsCall(isCall)
+            .build()
+        val cmd = XiaomiProto.Command.newBuilder()
+            .setType(NotificationCommands.COMMAND_TYPE)
+            .setSubtype(NotificationCommands.CMD_NOTIFICATION_SEND)
+            .setNotification(
+                XiaomiProto.Notification.newBuilder().setNotification2(
+                    XiaomiProto.Notification2.newBuilder().setNotification3(notif3),
+                ),
+            )
+            .build()
+        drv.sendCommand(cmd)
     }
 
     override fun getFilters(): Array<NotificationFilter> {
@@ -64,5 +90,21 @@ class HybridNotificationBridge : HybridHybridNotificationBridgeSpec() {
 
     override fun setMuteWhenDnd(enabled: Boolean) {
         MiBand9NotificationListener.setMuteWhenDnd(AppContext.context, enabled)
+    }
+
+    init {
+        // Listener forwards system notifications into our push() path automatically.
+        MiBand9NotificationListener.setForwarder { n ->
+            val req = NotificationPushRequest(
+                sourceId = n.packageName,
+                appName = n.packageName,
+                title = n.title,
+                body = n.body,
+                postedAt = n.postedAtMs.toDouble(),
+                category = NotificationCategory.MESSAGE,
+                iconBase64 = null,
+            )
+            push(req)
+        }
     }
 }
