@@ -1,0 +1,90 @@
+{
+  "app": {
+    "name": "小米手環 9 Active",
+    "tagline": "輕量伴侶,本機優先"
+  },
+  "common": {
+    "continue": "繼續",
+    "back": "返回",
+    "skip": "略過",
+    "cancel": "取消",
+    "done": "完成",
+    "retry": "重試",
+    "save": "儲存",
+    "delete": "刪除",
+    "ok": "確定",
+    "unsynced": "尚未同步",
+    "syncing": "同步中…",
+    "syncFailed": "同步失敗",
+    "lastSynced": "上次同步:{{when}}"
+  },
+  "onboarding": {
+    "welcome": {
+      "title": "用最輕的方式,認識你的小米手環 9 Active",
+      "body": "單機伴侶,不上雲,不追蹤。手機和手環一起省電。",
+      "cta": "開始使用"
+    },
+    "language": {
+      "title": "選擇語言",
+      "body": "稍後也可以在設定裡調整。",
+      "zhHant": "繁體中文",
+      "en": "English"
+    },
+    "bluetooth": {
+      "title": "藍牙存取",
+      "body": "需要藍牙和鄰近裝置權限才能跟手環通訊。不會蒐集位置資訊。",
+      "cta": "允許藍牙"
+    },
+    "notifications": {
+      "title": "通知存取",
+      "body": "將聊天、郵件、行事曆通知轉發到手環。要轉哪些 App 由你決定。",
+      "cta": "前往設定"
+    },
+    "battery": {
+      "title": "讓我保持喚醒",
+      "body": "請將本 App 加入電池最佳化白名單,避免夜間同步中斷。",
+      "cta": "立即設定"
+    },
+    "scan": {
+      "title": "尋找你的手環",
+      "body": "請喚醒手環並靠近手機。只會顯示名稱為「Xiaomi Smart Band 9 Active」的裝置。",
+      "cta": "開始掃描",
+      "scanning": "掃描中…",
+      "empty": "還沒找到任何裝置。請確認已在小米穿戴 App 解除配對。",
+      "select": "配對"
+    },
+    "auth": {
+      "title": "安全配對",
+      "body": "貼上 32 位元組授權金鑰。我們不會把它送離裝置。",
+      "placeholder": "授權金鑰",
+      "cta": "配對"
+    },
+    "done": {
+      "title": "設定完成",
+      "body": "手環已配對,首次同步將在背景進行。",
+      "cta": "進入儀表板"
+    }
+  },
+  "dashboard": {
+    "title": "今日",
+    "battery": "手環電量",
+    "steps": "步數",
+    "heartRate": "心率",
+    "sleep": "上次睡眠",
+    "stress": "壓力",
+    "spo2": "血氧",
+    "pai": "活力 (PAI)"
+  },
+  "notifications": {
+    "title": "通知轉發",
+    "permission": "需要通知存取權限",
+    "permissionBody": "授權後我們才能將通知轉到手環。",
+    "apps": "允許推送的 App",
+    "muteDnd": "手機勿擾時不轉發"
+  },
+  "errors": {
+    "btDenied": "已拒絕藍牙權限",
+    "notFound": "找不到手環",
+    "authFailed": "配對失敗 — 請檢查授權金鑰"
+  }
+}

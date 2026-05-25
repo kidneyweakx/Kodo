@@ -1,0 +1,90 @@
+{
+  "app": {
+    "name": "Mi Band 9 Active",
+    "tagline": "Slim companion. Local first."
+  },
+  "common": {
+    "continue": "Continue",
+    "back": "Back",
+    "skip": "Skip",
+    "cancel": "Cancel",
+    "done": "Done",
+    "retry": "Retry",
+    "save": "Save",
+    "delete": "Delete",
+    "ok": "OK",
+    "unsynced": "Not synced yet",
+    "syncing": "Syncing…",
+    "syncFailed": "Sync failed",
+    "lastSynced": "Last synced {{when}}"
+  },
+  "onboarding": {
+    "welcome": {
+      "title": "Travel light with your Mi Band 9 Active",
+      "body": "A single-device companion. No cloud. No tracking. Long battery life on both ends.",
+      "cta": "Get started"
+    },
+    "language": {
+      "title": "Pick your language",
+      "body": "You can change this later in Settings.",
+      "zhHant": "繁體中文",
+      "en": "English"
+    },
+    "bluetooth": {
+      "title": "Bluetooth access",
+      "body": "We need Bluetooth and nearby-devices to talk to your band. No location is collected.",
+      "cta": "Allow Bluetooth"
+    },
+    "notifications": {
+      "title": "Notification access",
+      "body": "Forward chat, mail and calendar alerts to your band. You choose which apps later.",
+      "cta": "Open Settings"
+    },
+    "battery": {
+      "title": "Keep us awake",
+      "body": "Whitelist this app from battery optimization so syncs do not stall overnight.",
+      "cta": "Whitelist now"
+    },
+    "scan": {
+      "title": "Find your band",
+      "body": "Wake your Mi Band 9 Active and bring it close. We will only show devices named “Xiaomi Smart Band 9 Active”.",
+      "cta": "Scan",
+      "scanning": "Scanning…",
+      "empty": "Nothing found yet. Make sure the band is unpaired in Xiaomi Wear.",
+      "select": "Pair"
+    },
+    "auth": {
+      "title": "Pair securely",
+      "body": "Paste the 32-byte auth key. We never send it off-device.",
+      "placeholder": "Auth key",
+      "cta": "Pair"
+    },
+    "done": {
+      "title": "All set",
+      "body": "Your band is paired. The first sync runs in the background.",
+      "cta": "Open dashboard"
+    }
+  },
+  "dashboard": {
+    "title": "Today",
+    "battery": "Band battery",
+    "steps": "Steps",
+    "heartRate": "Heart rate",
+    "sleep": "Last sleep",
+    "stress": "Stress",
+    "spo2": "SpO₂",
+    "pai": "Vitality (PAI)"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "permission": "Notification access required",
+    "permissionBody": "Grant access so we can forward alerts to the band.",
+    "apps": "Apps allowed to push",
+    "muteDnd": "Mute while phone is on Do Not Disturb"
+  },
+  "errors": {
+    "btDenied": "Bluetooth permission denied",
+    "notFound": "Band not found",
+    "authFailed": "Pairing failed — check the auth key"
+  }
+}
