@@ -19,7 +19,7 @@ import { getLocale, setLocale, t } from '@/libs/services/i18n';
 import { hapticsBridge } from '@/modules/haptics/hapticsBridge';
 import type { SupportedLocale } from '@/libs/services/i18n';
 
-const LANGUAGES: ReadonlyArray<{ code: SupportedLocale; labelKey: string }> = [
+const LANGUAGES: readonly { code: SupportedLocale; labelKey: string }[] = [
   { code: 'zh-Hant', labelKey: 'onboarding.language.zhHant' },
   { code: 'en', labelKey: 'onboarding.language.en' },
 ];

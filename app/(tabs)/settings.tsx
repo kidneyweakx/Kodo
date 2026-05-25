@@ -20,7 +20,7 @@ import type { ThemeId } from '@/context/ThemeContext';
 import type { SupportedLocale } from '@/libs/services/i18n';
 
 const THEME_IDS: readonly ThemeId[] = ['aurora', 'graphite', 'ember', 'lagoon'];
-const LANGS: ReadonlyArray<{ code: SupportedLocale; label: string }> = [
+const LANGS: readonly { code: SupportedLocale; label: string }[] = [
   { code: 'zh-Hant', label: '繁體中文' },
   { code: 'en', label: 'English' },
 ];

@@ -81,7 +81,7 @@ export default function NotificationsTab() {
             <View style={{ flex: 1, paddingRight: Spacing.md }}>
               <ThemedText variant="titleMedium">{t('notifications.muteDnd')}</ThemedText>
               <ThemedText variant="bodyMedium" tone="secondary">
-                Sync the phone's Do Not Disturb to the band.
+                Sync the phone&apos;s Do Not Disturb to the band.
               </ThemedText>
             </View>
             <Switch

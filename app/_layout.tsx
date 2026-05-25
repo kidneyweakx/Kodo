@@ -5,7 +5,6 @@
  * AGPL-3.0-or-later. See LICENSE, NOTICE.md.
  */
 
-import 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { Stack } from 'expo-router';
