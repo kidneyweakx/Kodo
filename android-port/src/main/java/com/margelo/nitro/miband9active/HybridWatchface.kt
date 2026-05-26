@@ -108,7 +108,7 @@ class HybridWatchface : HybridHybridWatchfaceSpec() {
         )
     }
 
-    override fun delete(watchfaceId: String): Promise<Unit> = Promise.async {
+    override fun remove(watchfaceId: String): Promise<Unit> = Promise.async {
         val drv = DriverHolder.current ?: return@async
         drv.sendCommand(
             XiaomiProto.Command.newBuilder()

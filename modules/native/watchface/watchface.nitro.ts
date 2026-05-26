@@ -25,6 +25,7 @@ export interface HybridWatchface
   /** `localFilePath` is an absolute path to a .bin file on the device. */
   install(localFilePath: string, watchfaceId: string): Promise<number>;
   setActive(watchfaceId: string): Promise<void>;
-  delete(watchfaceId: string): Promise<void>;
+  /** `delete` is a C++ keyword, so the Nitro spec uses `remove` instead. */
+  remove(watchfaceId: string): Promise<void>;
   onInstallProgress(listener: (percent: number) => void): () => void;
 }

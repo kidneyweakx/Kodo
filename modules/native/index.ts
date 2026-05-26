@@ -22,6 +22,7 @@ import type { HybridMusicBridge } from '@/modules/native/music/music.nitro';
 import type { HybridNotificationBridge } from '@/modules/native/notifications/notifications.nitro';
 import type { HybridSedentary } from '@/modules/native/sedentary/sedentary.nitro';
 import type { HybridSystemControl } from '@/modules/native/system/system.nitro';
+import type { HybridWatchface } from '@/modules/native/watchface/watchface.nitro';
 import type { HybridWeatherBridge } from '@/modules/native/weather/weather.nitro';
 import type { HybridWeatherProvider } from '@/modules/native/weatherProvider/weatherProvider.nitro';
 
@@ -33,18 +34,22 @@ const lazyHybrid = <T extends HybridObject<{ android: 'kotlin' }>>(name: string)
   };
 };
 
-export const NativeBandLink = lazyHybrid<HybridBandLink>('BandLink');
-export const NativeHealthStore = lazyHybrid<HybridHealthStore>('HealthStore');
-export const NativeNotificationBridge = lazyHybrid<HybridNotificationBridge>('NotificationBridge');
-export const NativeSystemControl = lazyHybrid<HybridSystemControl>('SystemControl');
-export const NativeMusicBridge = lazyHybrid<HybridMusicBridge>('MusicBridge');
-export const NativeWeatherBridge = lazyHybrid<HybridWeatherBridge>('WeatherBridge');
-export const NativeCalendarBridge = lazyHybrid<HybridCalendarBridge>('CalendarBridge');
-export const NativeCameraRemote = lazyHybrid<HybridCameraRemote>('CameraRemote');
-export const NativeGpsTracker = lazyHybrid<HybridGpsTracker>('GpsTracker');
-export const NativeSedentary = lazyHybrid<HybridSedentary>('Sedentary');
-export const NativeWeatherProvider = lazyHybrid<HybridWeatherProvider>('WeatherProvider');
-export const NativeHealthConnect = lazyHybrid<HybridHealthConnect>('HealthConnect');
+// Registration keys must match the names in nitro.json `autolinking` (i.e.
+// the spec interface name, including the `Hybrid` prefix), otherwise
+// HybridObjectRegistry on the C++ side won't find a constructor.
+export const NativeBandLink = lazyHybrid<HybridBandLink>('HybridBandLink');
+export const NativeHealthStore = lazyHybrid<HybridHealthStore>('HybridHealthStore');
+export const NativeNotificationBridge = lazyHybrid<HybridNotificationBridge>('HybridNotificationBridge');
+export const NativeSystemControl = lazyHybrid<HybridSystemControl>('HybridSystemControl');
+export const NativeMusicBridge = lazyHybrid<HybridMusicBridge>('HybridMusicBridge');
+export const NativeWeatherBridge = lazyHybrid<HybridWeatherBridge>('HybridWeatherBridge');
+export const NativeCalendarBridge = lazyHybrid<HybridCalendarBridge>('HybridCalendarBridge');
+export const NativeCameraRemote = lazyHybrid<HybridCameraRemote>('HybridCameraRemote');
+export const NativeGpsTracker = lazyHybrid<HybridGpsTracker>('HybridGpsTracker');
+export const NativeSedentary = lazyHybrid<HybridSedentary>('HybridSedentary');
+export const NativeWeatherProvider = lazyHybrid<HybridWeatherProvider>('HybridWeatherProvider');
+export const NativeHealthConnect = lazyHybrid<HybridHealthConnect>('HybridHealthConnect');
+export const NativeWatchface = lazyHybrid<HybridWatchface>('HybridWatchface');
 
 export type {
   HybridBandLink,
@@ -57,9 +62,11 @@ export type {
   HybridNotificationBridge,
   HybridSedentary,
   HybridSystemControl,
+  HybridWatchface,
   HybridWeatherBridge,
   HybridWeatherProvider,
 };
+export type { WatchfaceInfo } from '@/modules/native/watchface/watchface.nitro';
 
 export * from '@/modules/native/types';
 export type { GpsSample, WorkoutType } from '@/modules/native/gps/gps.nitro';
