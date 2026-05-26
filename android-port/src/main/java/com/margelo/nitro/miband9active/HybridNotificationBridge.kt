@@ -118,10 +118,14 @@ class HybridNotificationBridge : HybridHybridNotificationBridgeSpec() {
 
     init {
         // Listener forwards system notifications into our push() path automatically.
+        // Note: listener falls back to direct-to-band send if this forwarder is
+        // ever null (e.g. before JS imports notificationBridge), so we don't lose
+        // notifications during the listener-bound-but-JS-not-ready window.
         MiBand9NotificationListener.setForwarder { n ->
+            val label = MiBand9NotificationListener.resolveAppLabel(AppContext.context, n.packageName)
             val req = NotificationPushRequest(
                 sourceId = n.packageName,
-                appName = n.packageName,
+                appName = label,
                 title = n.title,
                 body = n.body,
                 postedAt = n.postedAtMs.toDouble(),
