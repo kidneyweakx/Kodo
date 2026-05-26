@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Mi Band 9 Active",
-    "slug": "mi-band-9-active",
+    "name": "Kodō",
+    "slug": "kodo",
     "version": "0.0.1",
     "platforms": ["android"],
     "orientation": "portrait",
-    "scheme": "miband9active",
+    "scheme": "kodo",
     "owner": "kidneyweakx",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -16,7 +16,8 @@
       "backgroundColor": "#0A0A0B"
     },
     "android": {
-      "package": "com.kidneyweakx.miband9active",
+      "package": "com.kidneyweakx.kodo",
+      "versionCode": 1,
       "permissions": [
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",

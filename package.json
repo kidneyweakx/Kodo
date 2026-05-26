@@ -1,9 +1,9 @@
 {
-  "name": "mi-band-9-active",
+  "name": "kodo",
   "version": "0.0.1",
   "private": true,
   "license": "AGPL-3.0-or-later",
-  "description": "Slim Xiaomi Smart Band 9 Active companion app, Expo + Nitro Modules port of Gadgetbridge.",
+  "description": "Kodō — slim companion app for Xiaomi Smart Band 9 Active. Expo + Nitro Modules port of Gadgetbridge.",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",

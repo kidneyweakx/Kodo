@@ -98,7 +98,7 @@ export function LogoLockup({ tagline, size = 132 }: LogoLockupProps) {
             letterSpacing: -0.5,
           }}
         >
-          Mi Band 9 Active
+          Kodō
         </ThemedText>
       </Animated.View>
 
