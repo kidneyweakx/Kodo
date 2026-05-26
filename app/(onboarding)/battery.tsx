@@ -4,22 +4,52 @@
  *
  * AGPL-3.0-or-later. See LICENSE, NOTICE.md.
  *
+ * Behaviour:
+ *   - First visit: shows the power profile copy + dual CTA.
+ *   - After the user has either opened settings or pressed skip once, the
+ *     `onboardingBatterySeen` MMKV flag is set; revisits auto-advance.
+ *
  * Doze whitelist is needed for *occasional* WorkManager wake-ups, not a
  * permanent foreground service. We still default to "off" and let the user
  * decide — fewer privileges == happier OEM battery scores.
  */
 
 import { router } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 
 import { Spacing } from '@/constants/DesignSystem';
 import { ThemedButton, ThemedSurface, ThemedText } from '@/components/themed';
 import { OnboardingScaffold } from '@/components/onboarding/OnboardingScaffold';
 import { PermissionHero } from '@/components/onboarding/PermissionHero';
+import { cache, cacheKeys } from '@/libs/services/cache';
+import { permissions } from '@/libs/services/permissions';
 import { t } from '@/libs/services/i18n';
 
+const NEXT = '/(onboarding)/scan' as const;
+
 export default function BatteryScreen() {
-  const onContinue = () => router.push('/(onboarding)/scan');
+  const advanced = useRef(false);
+
+  useEffect(() => {
+    const seen = cache.getSync<boolean>(cacheKeys.onboardingBatterySeen);
+    if (seen && !advanced.current) {
+      advanced.current = true;
+      router.replace(NEXT);
+    }
+  }, []);
+
+  const advance = () => {
+    if (advanced.current) return;
+    advanced.current = true;
+    cache.set(cacheKeys.onboardingBatterySeen, true);
+    router.replace(NEXT);
+  };
+
+  const onOpenSettings = async () => {
+    await permissions.openBatteryOptimizationSettings();
+    advance();
+  };
 
   return (
     <OnboardingScaffold
@@ -31,10 +61,10 @@ export default function BatteryScreen() {
       footer={
         <View style={{ flexDirection: 'row', gap: Spacing.md }}>
           <View style={{ flex: 1 }}>
-            <ThemedButton variant="ghost" label={t('common.skip')} size="lg" fullWidth onPress={onContinue} />
+            <ThemedButton variant="ghost" label={t('common.skip')} size="lg" fullWidth onPress={advance} />
           </View>
           <View style={{ flex: 1 }}>
-            <ThemedButton label={t('onboarding.battery.cta')} size="lg" fullWidth onPress={onContinue} />
+            <ThemedButton label={t('onboarding.battery.cta')} size="lg" fullWidth onPress={onOpenSettings} />
           </View>
         </View>
       }

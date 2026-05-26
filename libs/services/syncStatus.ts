@@ -83,6 +83,19 @@ export const syncStatus = {
   get(): SyncStatusSnapshot {
     return snapshot;
   },
+  setPhase(phase: SyncPhase, progress: number, startedAt: number): void {
+    emit({
+      ...snapshot,
+      phase,
+      progress: Math.max(0, Math.min(1, progress)),
+      label: phase,
+      startedAt,
+      errorMessage: null,
+    });
+  },
+  setDone(finishedAt: string): void {
+    emit({ ...snapshot, phase: 'idle', progress: 0, label: '', lastSyncedAt: finishedAt });
+  },
   setError(message: string): void {
     emit({ ...snapshot, phase: 'error', errorMessage: message });
   },

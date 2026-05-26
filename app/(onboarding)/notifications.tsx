@@ -3,30 +3,51 @@
  * Copyright (C) 2026 kidneyweakx
  *
  * AGPL-3.0-or-later. See LICENSE, NOTICE.md.
+ *
+ * Behaviour:
+ *   - If NotificationListener access is already granted → auto-advance.
+ *   - Otherwise CTA opens the OS settings (POST_NOTIFICATIONS dialog +
+ *     Notification Listener picker). When the user returns with access
+ *     granted, the `useNotificationAccess` polling effect detects it and
+ *     advances automatically.
+ *   - Skip is always available.
  */
 
 import { router } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 
 import { Spacing } from '@/constants/DesignSystem';
 import { ThemedButton } from '@/components/themed';
 import { OnboardingScaffold } from '@/components/onboarding/OnboardingScaffold';
 import { PermissionHero } from '@/components/onboarding/PermissionHero';
-import { notificationBridge, useNotificationAccess } from '@/libs/services/notificationBridge';
+import { useNotificationAccess } from '@/libs/services/notificationBridge';
+import { permissions } from '@/libs/services/permissions';
 import { t } from '@/libs/services/i18n';
+
+const NEXT = '/(onboarding)/battery' as const;
 
 export default function NotificationsScreen() {
   const granted = useNotificationAccess();
+  const advanced = useRef(false);
 
-  const onRequest = () => {
-    try {
-      notificationBridge.requestAccess();
-    } catch {
-      // Pre-prebuild: Nitro module not loaded yet. Allow the flow to advance.
+  useEffect(() => {
+    if (granted && !advanced.current) {
+      advanced.current = true;
+      router.replace(NEXT);
     }
+  }, [granted]);
+
+  const onContinue = () => {
+    if (advanced.current) return;
+    advanced.current = true;
+    router.replace(NEXT);
   };
 
-  const onContinue = () => router.push('/(onboarding)/battery');
+  const onRequest = async () => {
+    await permissions.requestPostNotifications();
+    await permissions.openNotificationListenerSettings();
+  };
 
   return (
     <OnboardingScaffold

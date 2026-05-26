@@ -56,7 +56,12 @@ object HealthCommands {
 
     const val CMD_REALTIME_STARTSTOP = 0
     const val CMD_REALTIME_STATS = 1
-    const val CMD_FETCH_ACTIVITY_FILE = 5
+
+    // Activity sync. Mirrors XiaomiHealthService.java:72-75 in Gadgetbridge.
+    const val CMD_ACTIVITY_FETCH_TODAY = 1
+    const val CMD_ACTIVITY_FETCH_PAST = 2
+    const val CMD_ACTIVITY_FETCH_REQUEST = 3
+    const val CMD_ACTIVITY_FETCH_ACK = 5
     const val CMD_FETCH_ACTIVITY_DETAILS = 6
     const val CMD_VITALITY_SCORE_GET = 21
     const val CMD_INACTIVITY_GET = 28

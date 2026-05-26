@@ -29,16 +29,22 @@ export default function AuthScreen() {
   const name = String(params.name ?? '');
 
   const onPair = async () => {
+    const key = authKey.trim();
+    console.log('[auth.tsx] saving binding', { deviceId, name, keyLen: key.length });
     setPairing(true);
     setError(null);
     try {
-      await bandLink.pair(deviceId, authKey.trim());
+      // Local bind only — no GATT, no handshake here. The real connect runs
+      // on first sync from the dashboard so the user has visible status.
+      await bandLink.pair(deviceId, key, name);
       cache.set(cacheKeys.onboardingDone, true);
       void hapticsBridge.fire('success');
       router.replace('/(onboarding)/done');
-    } catch {
+    } catch (e) {
+      console.warn('[auth.tsx] pair failed:', e);
       void hapticsBridge.fire('error');
-      setError(t('errors.authFailed'));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(`${t('errors.authFailed')}\n${msg}`);
       setPairing(false);
     }
   };

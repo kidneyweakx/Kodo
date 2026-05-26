@@ -12,15 +12,13 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanCallback
-import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
-import android.os.ParcelUuid
+import android.util.Log
 import com.kidneyweakx.miband9active.AppContext
 import com.kidneyweakx.miband9active.DriverHolder
 import com.kidneyweakx.miband9active.xiaomi.auth.XiaomiCrypto
 import com.kidneyweakx.miband9active.xiaomi.protocol.MiBand9BleDriver
-import com.kidneyweakx.miband9active.xiaomi.protocol.XiaomiUuids
 import com.margelo.nitro.core.Promise
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CompletableDeferred
@@ -28,8 +26,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 
 class HybridBandLink : HybridHybridBandLinkSpec() {
 
@@ -55,17 +55,44 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
     @SuppressLint("MissingPermission")
     override fun scan(options: BandLinkScanOptions): Promise<Array<DiscoveredBand>> = Promise.async {
         val durationMs = (options.durationMs ?: 12_000.0).toLong().coerceIn(1_000L, 15_000L)
+        Log.i(TAG, "scan() requested durationMs=$durationMs")
         val ctx = AppContext.context
         val mgr = ctx.getSystemService(BluetoothManager::class.java)
-            ?: return@async emptyArray<DiscoveredBand>()
+        if (mgr == null) {
+            Log.e(TAG, "scan() abort: BluetoothManager is null")
+            return@async emptyArray<DiscoveredBand>()
+        }
         val adapter: BluetoothAdapter? = mgr.adapter
-        val scanner = adapter?.bluetoothLeScanner ?: return@async emptyArray<DiscoveredBand>()
+        if (adapter == null) {
+            Log.e(TAG, "scan() abort: BluetoothAdapter is null (no BT hardware?)")
+            return@async emptyArray<DiscoveredBand>()
+        }
+        Log.i(TAG, "scan() adapter.isEnabled=${adapter.isEnabled} state=${adapter.state}")
+        val scanner = adapter.bluetoothLeScanner
+        if (scanner == null) {
+            Log.e(TAG, "scan() abort: BluetoothLeScanner is null (BT off?)")
+            return@async emptyArray<DiscoveredBand>()
+        }
 
         val results = mutableListOf<DiscoveredBand>()
+        val seenAddresses = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+        val totalSeen = java.util.concurrent.atomic.AtomicInteger(0)
         val deferred = CompletableDeferred<Unit>()
         val cb = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
-                val name = result.device?.name ?: return
+                totalSeen.incrementAndGet()
+                val addr = result.device?.address ?: "??"
+                val deviceName = result.device?.name
+                val recordName = result.scanRecord?.deviceName
+                val name = deviceName ?: recordName
+                // First time we see this MAC, log it once with full diagnostic.
+                if (seenAddresses.add(addr)) {
+                    Log.d(
+                        TAG,
+                        "scan hit mac=$addr device.name=$deviceName scanRecord.name=$recordName rssi=${result.rssi}",
+                    )
+                }
+                if (name == null) return
                 if (!BAND_NAME_REGEX.containsMatchIn(name)) return
                 val band = DiscoveredBand(
                     id = result.device.address,
@@ -73,11 +100,17 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
                     rssi = result.rssi.toDouble(),
                 )
                 if (results.none { it.id == band.id }) {
+                    Log.i(TAG, "scan MATCHED Mi Band: name=$name mac=$addr rssi=${result.rssi}")
                     results += band
                     scanListeners.forEach { it(band) }
                 }
             }
+            override fun onBatchScanResults(results: MutableList<ScanResult>) {
+                Log.d(TAG, "scan onBatchScanResults size=${results.size}")
+                results.forEach { onScanResult(ScanSettings.CALLBACK_TYPE_ALL_MATCHES, it) }
+            }
             override fun onScanFailed(errorCode: Int) {
+                Log.e(TAG, "scan onScanFailed errorCode=$errorCode (see ScanCallback.SCAN_FAILED_*)")
                 deferred.complete(Unit)
             }
         }
@@ -85,15 +118,68 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
         _connectionState = ConnectionState.SCANNING
         notifyConnectionState()
 
-        val filter = ScanFilter.Builder()
-            .setServiceUuid(ParcelUuid(XiaomiUuids.SERVICE_V2))
+        // Mirror Gadgetbridge's DiscoveryActivityV2.startDiscovery (lines
+        // 307–323): a band that's already bonded + connected to *another*
+        // app (e.g. Gadgetbridge, Mi Fitness) does not advertise, so plain
+        // BLE scan never sees it. Pre-populate from the system bonded list
+        // so the user can still pick it.
+        try {
+            val bonded = adapter.bondedDevices ?: emptySet()
+            Log.i(TAG, "scan pre-populate: ${bonded.size} system-bonded devices")
+            for (device in bonded) {
+                val devName = device.name
+                Log.d(TAG, "scan bonded mac=${device.address} name=$devName")
+                if (devName == null) continue
+                if (!BAND_NAME_REGEX.containsMatchIn(devName)) continue
+                if (seenAddresses.add(device.address)) {
+                    val band = DiscoveredBand(
+                        id = device.address,
+                        name = devName,
+                        rssi = 0.0,
+                    )
+                    Log.i(TAG, "scan PRE-ADDED bonded Mi Band: $devName mac=${device.address}")
+                    results += band
+                    scanListeners.forEach { it(band) }
+                }
+            }
+        } catch (e: SecurityException) {
+            Log.w(TAG, "scan bondedDevices threw SecurityException — missing BLUETOOTH_CONNECT?", e)
+        }
+
+        // Match Gadgetbridge's DiscoveryActivityV2.startBTLEDiscovery:
+        //   - null filter (Mi Band 9 Active doesn't advertise SERVICE_V2 UUID in
+        //     the scan record, so filtering by it returns 0 hits)
+        //   - LOW_LATENCY + AGGRESSIVE match for snappy discovery
+        val settings = ScanSettings.Builder()
+            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
+            .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
+            .setNumOfMatches(ScanSettings.MATCH_NUM_ONE_ADVERTISEMENT)
             .build()
-        val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_BALANCED).build()
 
-        scanner.startScan(listOf(filter), settings, cb)
+        Log.i(TAG, "scan startScan(null filter, LOW_LATENCY/AGGRESSIVE) for ${durationMs}ms")
+        try {
+            scanner.startScan(null, settings, cb)
+        } catch (e: SecurityException) {
+            Log.e(TAG, "scan startScan SecurityException — missing BLUETOOTH_SCAN at runtime?", e)
+            _connectionState = ConnectionState.DISCONNECTED
+            notifyConnectionState()
+            return@async emptyArray<DiscoveredBand>()
+        } catch (e: Throwable) {
+            Log.e(TAG, "scan startScan threw", e)
+            _connectionState = ConnectionState.DISCONNECTED
+            notifyConnectionState()
+            return@async emptyArray<DiscoveredBand>()
+        }
         kotlinx.coroutines.delay(durationMs)
-        try { scanner.stopScan(cb) } catch (_: Throwable) {}
+        try { scanner.stopScan(cb) } catch (t: Throwable) {
+            Log.w(TAG, "scan stopScan threw (probably already stopped)", t)
+        }
 
+        Log.i(
+            TAG,
+            "scan complete: totalAdvertisements=${totalSeen.get()} uniqueDevices=${seenAddresses.size} matched=${results.size}",
+        )
         _connectionState = ConnectionState.DISCONNECTED
         notifyConnectionState()
         results.toTypedArray()
@@ -106,6 +192,7 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
 
     @SuppressLint("MissingPermission")
     override fun pair(deviceId: String, options: BandLinkPairOptions): Promise<PairedBand> = Promise.async {
+        Log.i(TAG, "pair() device=$deviceId authKey.length=${options.authKey.length}")
         val authKey = XiaomiCrypto.parseAuthKey(options.authKey)
             ?: throw IllegalArgumentException("Auth key must be 32 hex chars (with or without 0x prefix)")
 
@@ -114,13 +201,22 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
         val device = mgr.adapter?.getRemoteDevice(deviceId)
             ?: throw IllegalStateException("Device $deviceId not reachable via adapter")
 
+        // If a previous pair attempt is in flight, tear it down first so we
+        // don't end up with two GATT connections fighting for the band.
+        driver?.let {
+            Log.w(TAG, "pair(): tearing down previous driver before re-pair")
+            it.disconnect()
+            it.close()
+        }
+
         val drv = MiBand9BleDriver(AppContext.context, authKey)
         driver = drv
         DriverHolder.current = drv
         observeDriver(drv)
         drv.connect(device)
 
-        // Wait until driver reports Connected or Error.
+        // Wait until driver reports Connected or Error, but cap at 30s so the
+        // UI never hangs forever on a silent auth stall.
         val connectedDeferred = CompletableDeferred<MiBand9BleDriver.State>()
         scope.launch {
             drv.state.collect { st ->
@@ -131,7 +227,14 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
                 }
             }
         }
-        val final = connectedDeferred.await()
+        val final = try {
+            withTimeout(30_000) { connectedDeferred.await() }
+        } catch (e: TimeoutCancellationException) {
+            Log.e(TAG, "pair() timed out after 30s — driver state=${drv.state.value}")
+            drv.disconnect()
+            throw IllegalStateException("Pair timed out (band may be paired with another app)")
+        }
+        Log.i(TAG, "pair() final driver state = $final")
         if (final !is MiBand9BleDriver.State.Connected) {
             throw IllegalStateException("Pair failed: $final")
         }
@@ -185,7 +288,11 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
         val drv = driver ?: throw IllegalStateException("Not connected")
         val fetcher = com.kidneyweakx.miband9active.xiaomi.activity.XiaomiActivityFileFetcher()
         val filesParsed = java.util.concurrent.atomic.AtomicInteger(0)
-        val lastChunkAt = java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis())
+        val pendingFiles = java.util.concurrent.ConcurrentLinkedDeque<com.kidneyweakx.miband9active.xiaomi.activity.XiaomiActivityFileId>()
+        val currentFileDone = kotlinx.coroutines.CompletableDeferred<Unit>().apply { complete(Unit) }
+        val activeFile = java.util.concurrent.atomic.AtomicReference<com.kidneyweakx.miband9active.xiaomi.activity.XiaomiActivityFileId?>(null)
+        val activeDone = java.util.concurrent.atomic.AtomicReference(currentFileDone)
+        val pastDone = kotlinx.coroutines.CompletableDeferred<Unit>()
 
         fetcher.onFile = { parsed ->
             when (parsed) {
@@ -202,47 +309,137 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
                     )
                     filesParsed.incrementAndGet()
                 }
+                is com.kidneyweakx.miband9active.xiaomi.activity.ParsedActivityFile.Workout -> {
+                    com.kidneyweakx.miband9active.SampleStore.persistWorkout(parsed.fileId, parsed.fields)
+                    filesParsed.incrementAndGet()
+                }
                 is com.kidneyweakx.miband9active.xiaomi.activity.ParsedActivityFile.Unknown -> Unit
             }
-            scope.launch { ackRecordedData(drv, parsed.fileId()) }
+            // Mark the active file's chunk-stream as drained.
+            activeDone.get().takeIf { !it.isCompleted }?.complete(Unit)
         }
 
-        // 1) Subscribe to incoming activity chunks BEFORE sending the request
-        //    so we don't drop the first packet.
-        val collector = scope.launch {
+        // Subscribe to ACTIVITY-channel chunks BEFORE sending any request so
+        // we don't drop the first packet.
+        val chunkCollector = scope.launch {
             drv.activityChunks.collect { chunk ->
-                lastChunkAt.set(System.currentTimeMillis())
                 fetcher.addChunk(chunk)
             }
         }
 
-        // 2) Ask the band for today's activity file list. Band streams
-        //    chunks back on the ACTIVITY channel.
+        // Subscribe to PROTOBUF-channel responses (type=8) for the file-id
+        // list. Mirrors XiaomiHealthService.handleActivityFetchResponse.
+        val fileIdCollector = scope.launch {
+            drv.incoming.collect { msg ->
+                if (msg.type != com.kidneyweakx.miband9active.xiaomi.services.HealthCommands.COMMAND_TYPE) return@collect
+                when (msg.subtype) {
+                    com.kidneyweakx.miband9active.xiaomi.services.HealthCommands.CMD_ACTIVITY_FETCH_TODAY,
+                    com.kidneyweakx.miband9active.xiaomi.services.HealthCommands.CMD_ACTIVITY_FETCH_PAST -> {
+                        val raw = msg.command.health.activityRequestFileIds.toByteArray()
+                        Log.i(TAG, "syncSince: got ${raw.size / 7} file IDs (subtype=${msg.subtype})")
+                        if (raw.size % 7 == 0) {
+                            val buf = java.nio.ByteBuffer.wrap(raw).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                            while (buf.position() < buf.limit()) {
+                                val id = com.kidneyweakx.miband9active.xiaomi.activity.XiaomiActivityFileId.from(buf)
+                                if (id.timestamp.time != 0L || id.version != 0) {
+                                    pendingFiles.addLast(id)
+                                }
+                            }
+                        }
+                        if (msg.subtype == com.kidneyweakx.miband9active.xiaomi.services.HealthCommands.CMD_ACTIVITY_FETCH_PAST) {
+                            pastDone.complete(Unit)
+                        }
+                    }
+                }
+            }
+        }
+
+        try {
+            // 1) Ask the band for today's file IDs.
+            sendFetchToday(drv)
+
+            // 2) Drain the queue. We process today's IDs as they arrive; if no
+            //    more files are pending after a short wait, also kick the past
+            //    fetch. Cap at 120s total.
+            val deadline = System.currentTimeMillis() + 120_000L
+            var requestedPast = false
+            while (System.currentTimeMillis() < deadline) {
+                val fileId = pendingFiles.pollFirst()
+                if (fileId != null) {
+                    activeFile.set(fileId)
+                    val done = kotlinx.coroutines.CompletableDeferred<Unit>()
+                    activeDone.set(done)
+                    Log.i(TAG, "syncSince: requesting file $fileId")
+                    requestRecordedData(drv, fileId)
+                    val finished = try { kotlinx.coroutines.withTimeoutOrNull(15_000) { done.await() } } catch (_: Throwable) { null }
+                    if (finished == null) {
+                        Log.w(TAG, "syncSince: timeout waiting for file $fileId chunks; skipping")
+                    }
+                    ackRecordedData(drv, fileId)
+                    continue
+                }
+                // No pending files at this instant. If we haven't asked for
+                // past data yet, do so now.
+                if (!requestedPast) {
+                    Log.i(TAG, "syncSince: today's queue drained, requesting past")
+                    requestedPast = true
+                    sendFetchPast(drv)
+                    // Wait briefly for PAST response to populate queue.
+                    kotlinx.coroutines.withTimeoutOrNull(3_000) { pastDone.await() }
+                    continue
+                }
+                // Past was requested and queue is still empty → all done.
+                break
+            }
+        } finally {
+            chunkCollector.cancel()
+            fileIdCollector.cancel()
+        }
+        Log.i(TAG, "syncSince: finished, filesParsed=${filesParsed.get()}")
+        filesParsed.get().toDouble()
+    }
+
+    private suspend fun sendFetchToday(drv: MiBand9BleDriver) {
         drv.sendCommand(
             nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto.Command.newBuilder()
                 .setType(com.kidneyweakx.miband9active.xiaomi.services.HealthCommands.COMMAND_TYPE)
-                .setSubtype(2) // get today
+                .setSubtype(com.kidneyweakx.miband9active.xiaomi.services.HealthCommands.CMD_ACTIVITY_FETCH_TODAY)
                 .setHealth(
                     nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto.Health.newBuilder()
                         .setActivitySyncRequestToday(
                             nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto.ActivitySyncRequestToday
-                                .newBuilder()
-                                .setUnknown1(0)
-                                .build(),
+                                .newBuilder().setUnknown1(0).build(),
                         ),
                 )
                 .build(),
         )
+    }
 
-        // 3) Per upstream: a 5 s of silence after the last chunk means the
-        //    band has nothing more to send. Cap the whole sync at 60 s.
-        val deadline = System.currentTimeMillis() + 60_000
-        while (System.currentTimeMillis() < deadline) {
-            kotlinx.coroutines.delay(1_000)
-            if (System.currentTimeMillis() - lastChunkAt.get() > 5_000) break
-        }
-        collector.cancel()
-        filesParsed.get().toDouble()
+    private suspend fun sendFetchPast(drv: MiBand9BleDriver) {
+        drv.sendCommand(
+            nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto.Command.newBuilder()
+                .setType(com.kidneyweakx.miband9active.xiaomi.services.HealthCommands.COMMAND_TYPE)
+                .setSubtype(com.kidneyweakx.miband9active.xiaomi.services.HealthCommands.CMD_ACTIVITY_FETCH_PAST)
+                .build(),
+        )
+    }
+
+    private suspend fun requestRecordedData(
+        drv: MiBand9BleDriver,
+        fileId: com.kidneyweakx.miband9active.xiaomi.activity.XiaomiActivityFileId,
+    ) {
+        drv.sendCommand(
+            nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto.Command.newBuilder()
+                .setType(com.kidneyweakx.miband9active.xiaomi.services.HealthCommands.COMMAND_TYPE)
+                .setSubtype(com.kidneyweakx.miband9active.xiaomi.services.HealthCommands.CMD_ACTIVITY_FETCH_REQUEST)
+                .setHealth(
+                    nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto.Health.newBuilder()
+                        .setActivityRequestFileIds(
+                            com.google.protobuf.ByteString.copyFrom(fileId.toBytes()),
+                        ),
+                )
+                .build(),
+        )
     }
 
     /** Tell the band we got this file so it can purge it from on-band flash. */
@@ -253,7 +450,7 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
         drv.sendCommand(
             nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto.Command.newBuilder()
                 .setType(com.kidneyweakx.miband9active.xiaomi.services.HealthCommands.COMMAND_TYPE)
-                .setSubtype(3) // ack
+                .setSubtype(com.kidneyweakx.miband9active.xiaomi.services.HealthCommands.CMD_ACTIVITY_FETCH_ACK)
                 .setHealth(
                     nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto.Health.newBuilder()
                         .setActivitySyncAckFileIds(
@@ -306,6 +503,54 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
                 notifyConnectionState()
             }
         }
+        // System events: battery + find_phone, both come on (type=2). Mirrors
+        // XiaomiSystemService.handleCommand.
+        scope.launch {
+            drv.incoming.collect { msg ->
+                if (msg.type != com.kidneyweakx.miband9active.xiaomi.services.SystemCommands.COMMAND_TYPE) return@collect
+                when (msg.subtype) {
+                    com.kidneyweakx.miband9active.xiaomi.services.SystemCommands.CMD_BATTERY -> {
+                        val battery = msg.command.system.power.battery
+                        val percent = battery.level.toDouble()
+                        val charging = battery.state == 1
+                        val info = BatteryInfo(
+                            percent = percent,
+                            charging = charging,
+                            updatedAt = java.time.Instant.now().toString(),
+                        )
+                        _battery = info
+                        Log.i(TAG, "battery update: $percent% charging=$charging")
+                        batteryListeners.forEach { it(info) }
+                    }
+                    com.kidneyweakx.miband9active.xiaomi.services.SystemCommands.CMD_FIND_PHONE -> {
+                        if (msg.command.hasSystem()) {
+                            val op = msg.command.system.findDevice
+                            Log.i(TAG, "find phone op=$op (0=start)")
+                            if (op == 0) {
+                                com.kidneyweakx.miband9active.PhoneRinger.start()
+                            } else {
+                                com.kidneyweakx.miband9active.PhoneRinger.stop()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Trigger a fresh battery query (idempotent). */
+    fun requestBattery() {
+        val drv = driver ?: return
+        scope.launch {
+            try {
+                drv.sendCommand(
+                    com.kidneyweakx.miband9active.xiaomi.services.SystemCommands.COMMAND_TYPE,
+                    com.kidneyweakx.miband9active.xiaomi.services.SystemCommands.CMD_BATTERY,
+                )
+            } catch (t: Throwable) {
+                Log.w(TAG, "requestBattery failed", t)
+            }
+        }
     }
 
     private fun notifyConnectionState() {
@@ -313,6 +558,10 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
     }
 
     companion object {
-        private val BAND_NAME_REGEX = Regex("^Xiaomi( Smart)? Band 9 Active [0-9A-F]{4}$")
+        private const val TAG = "HybridBandLink"
+        // Mi Band 9 Active advertises as "Xiaomi Band 9 Active XXXX" (no
+        // "Smart" in the advertised name on this model). Keep loose so we
+        // also match the Gadgetbridge naming variant.
+        private val BAND_NAME_REGEX = Regex("^Xiaomi( Smart)? Band 9 Active [0-9A-Fa-f]{4}$")
     }
 }

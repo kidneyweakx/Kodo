@@ -3,7 +3,9 @@
  */
 package com.margelo.nitro.miband9active
 
+import com.kidneyweakx.miband9active.AppContext
 import com.kidneyweakx.miband9active.DriverHolder
+import com.kidneyweakx.miband9active.PhoneRinger
 import com.kidneyweakx.miband9active.xiaomi.services.SystemCommands
 import com.margelo.nitro.core.Promise
 import java.util.Calendar
@@ -20,14 +22,13 @@ class HybridSystemControl : HybridHybridSystemControlSpec() {
         stepGoal = 8_000.0,
     )
 
-    /** Phone-side ringer when the band presses "Find phone". The actual ring
-     *  must be driven by the JS layer (it owns the audio session) — we just
-     *  expose a hook so the BLE side can flip a flag. */
     override fun ringPhone() {
-        // Triggered by band -> phone via driver.incoming subscription in JS.
-        // Phone-side audio is the React layer's responsibility.
+        PhoneRinger.start(AppContext.context)
     }
-    override fun silencePhone() {}
+
+    override fun silencePhone() {
+        PhoneRinger.stop(AppContext.context)
+    }
 
     override fun syncClock(): Promise<Unit> = Promise.async {
         val drv = DriverHolder.current ?: return@async
