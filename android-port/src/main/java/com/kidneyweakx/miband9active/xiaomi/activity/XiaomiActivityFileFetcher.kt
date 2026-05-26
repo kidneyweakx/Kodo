@@ -20,11 +20,13 @@ import java.util.zip.CRC32
 sealed class ParsedActivityFile {
     data class DailySamples(val fileId: XiaomiActivityFileId, val samples: List<XiaomiActivitySample>) : ParsedActivityFile()
     data class Sleep(val fileId: XiaomiActivityFileId, val sleep: SleepFile) : ParsedActivityFile()
+    data class Workout(val fileId: XiaomiActivityFileId, val fields: WorkoutFields) : ParsedActivityFile()
     data class Unknown(val fileId: XiaomiActivityFileId, val raw: ByteArray) : ParsedActivityFile()
 
     fun fileId(): XiaomiActivityFileId = when (this) {
         is DailySamples -> fileId
         is Sleep -> fileId
+        is Workout -> fileId
         is Unknown -> fileId
     }
 }
@@ -58,14 +60,18 @@ class XiaomiActivityFileFetcher {
         if (expectedCrc != actualCrc) return
 
         val fileId = XiaomiActivityFileId.from(data.copyOfRange(0, 7))
-        val parsed: ParsedActivityFile = when (fileId.subtype) {
-            XiaomiActivityFileId.Subtype.ACTIVITY_DAILY ->
+        val parsed: ParsedActivityFile = when {
+            fileId.subtype == XiaomiActivityFileId.Subtype.ACTIVITY_DAILY ->
                 DailyDetailsParser.parse(fileId, data)
                     ?.let { ParsedActivityFile.DailySamples(fileId, it) }
                     ?: ParsedActivityFile.Unknown(fileId, data)
-            XiaomiActivityFileId.Subtype.ACTIVITY_SLEEP_STAGES ->
+            fileId.subtype == XiaomiActivityFileId.Subtype.ACTIVITY_SLEEP_STAGES ->
                 SleepStagesParser.parse(fileId, data)
                     ?.let { ParsedActivityFile.Sleep(fileId, it) }
+                    ?: ParsedActivityFile.Unknown(fileId, data)
+            fileId.type == XiaomiActivityFileId.Type.SPORTS ->
+                WorkoutSummaryParser.parse(fileId, data)
+                    ?.let { ParsedActivityFile.Workout(fileId, it) }
                     ?: ParsedActivityFile.Unknown(fileId, data)
             else -> ParsedActivityFile.Unknown(fileId, data)
         }

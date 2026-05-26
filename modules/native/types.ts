@@ -71,6 +71,39 @@ export interface StressSample {
   readonly bucket: StressBucket;
 }
 
+/** A logged workout session pulled from the band's activity files. */
+export type WorkoutKind =
+  | 'running'
+  | 'walking'
+  | 'treadmill'
+  | 'outdoor_cycling'
+  | 'indoor_cycling'
+  | 'freestyle'
+  | 'pool_swimming'
+  | 'hiit'
+  | 'elliptical'
+  | 'rowing'
+  | 'jump_rope'
+  | 'other';
+
+export interface WorkoutSummary {
+  /** Unique per-session id. Derived from fileId (timestamp + version). */
+  readonly id: string;
+  readonly kind: WorkoutKind;
+  readonly startedAt: string;
+  /** ISO. Null if not yet known (band is mid-recording). */
+  readonly endedAt: string | null;
+  readonly durationSeconds: number;
+  /** Active calories. Null if not reported. */
+  readonly kcal: number | null;
+  /** Meters. Null for indoor non-distance workouts (e.g. freestyle/HIIT). */
+  readonly distanceMeters: number | null;
+  readonly hrAvg: number | null;
+  readonly hrMax: number | null;
+  readonly hrMin: number | null;
+  readonly steps: number | null;
+}
+
 export interface BatteryInfo {
   readonly percent: number;
   readonly charging: boolean;

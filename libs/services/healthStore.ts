@@ -14,7 +14,7 @@ import { cache, cacheKeys } from '@/libs/services/cache';
 import { NativeHealthStore } from '@/modules/native';
 import { safeCall } from '@/modules/native/safe';
 import { syncStatus } from '@/libs/services/syncStatus';
-import type { HealthDailySummary } from '@/modules/native';
+import type { HealthDailySummary, WorkoutSummary } from '@/modules/native';
 
 const todayIso = (): string => new Date().toISOString().slice(0, 10);
 
@@ -43,6 +43,26 @@ export const healthStore = {
     return fresh;
   },
 };
+
+/** Recent workout sessions read from the native sample store. */
+export function useRecentWorkouts(limit = 10): readonly WorkoutSummary[] {
+  const [items, setItems] = useState<readonly WorkoutSummary[]>(() =>
+    safeCall<readonly WorkoutSummary[]>(() => NativeHealthStore().getRecentWorkouts(limit), []),
+  );
+  // Refresh after each successful sync so newly-fetched workouts appear.
+  useEffect(() => {
+    return syncStatus.subscribe((s) => {
+      if (s.phase === 'idle' || s.phase === 'done') {
+        const next = safeCall<readonly WorkoutSummary[]>(
+          () => NativeHealthStore().getRecentWorkouts(limit),
+          [],
+        );
+        setItems(next);
+      }
+    });
+  }, [limit]);
+  return items;
+}
 
 export function useDashboardSummary(dateIso: string = todayIso()): DashboardReadModel {
   const [model, setModel] = useState<DashboardReadModel>(() => readDashboardSync(dateIso));

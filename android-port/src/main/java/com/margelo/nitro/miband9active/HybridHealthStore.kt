@@ -6,6 +6,7 @@ package com.margelo.nitro.miband9active
 import com.kidneyweakx.miband9active.SampleStore
 import com.kidneyweakx.miband9active.xiaomi.activity.NOT_MEASURED
 import com.kidneyweakx.miband9active.xiaomi.activity.SleepStageSample
+import com.kidneyweakx.miband9active.xiaomi.activity.XiaomiActivityFileId
 import com.kidneyweakx.miband9active.xiaomi.activity.XiaomiActivitySample
 import java.time.Instant
 import java.time.LocalDate
@@ -77,6 +78,57 @@ class HybridHealthStore : HybridHybridHealthStoreSpec() {
                 },
             )
         }.toTypedArray()
+    }
+
+    override fun getRecentWorkouts(limit: Double): Array<WorkoutSummary> {
+        val n = limit.toInt().coerceAtLeast(1).coerceAtMost(500)
+        val rows = SampleStore.loadRecentWorkouts(n)
+        return rows.mapNotNull { o ->
+            val startSec = o.optLong("startSec", 0L)
+            if (startSec == 0L) return@mapNotNull null
+            val endSec = if (o.has("endSec")) o.optLong("endSec") else null
+            val durationSec = (o.optInt("activeSec", 0).takeIf { it > 0 }
+                ?: (endSec?.let { (it - startSec).toInt().coerceAtLeast(0) })
+                ?: 0).toDouble()
+            val subtypeCode = o.optInt("subtype", -1)
+            val kind = workoutKindFor(subtypeCode)
+            WorkoutSummary(
+                id = o.optString("id"),
+                kind = kind,
+                startedAt = Instant.ofEpochSecond(startSec).toString(),
+                endedAt = endSec?.let {
+                    Variant_NullType_String.create(Instant.ofEpochSecond(it).toString())
+                },
+                durationSeconds = durationSec,
+                kcal = if (o.has("kcal")) Variant_NullType_Double.create(o.optDouble("kcal")) else null,
+                distanceMeters = if (o.has("distM")) Variant_NullType_Double.create(o.optDouble("distM")) else null,
+                hrAvg = if (o.has("hrAvg")) Variant_NullType_Double.create(o.optDouble("hrAvg")) else null,
+                hrMax = if (o.has("hrMax")) Variant_NullType_Double.create(o.optDouble("hrMax")) else null,
+                hrMin = if (o.has("hrMin")) Variant_NullType_Double.create(o.optDouble("hrMin")) else null,
+                steps = if (o.has("steps")) Variant_NullType_Double.create(o.optDouble("steps")) else null,
+            )
+        }.toTypedArray()
+    }
+
+    private fun workoutKindFor(subtypeCode: Int): WorkoutKind {
+        // Map XiaomiActivityFileId.Subtype.code → WorkoutKind. See
+        // XiaomiActivityFileId.kt for the canonical code table.
+        return when (subtypeCode) {
+            0x01 -> WorkoutKind.RUNNING          // SPORTS_OUTDOOR_RUNNING
+            0x02 -> WorkoutKind.WALKING          // SPORTS_OUTDOOR_WALKING_V1
+            0x16 -> WorkoutKind.WALKING          // SPORTS_OUTDOOR_WALKING_V2
+            0x03 -> WorkoutKind.TREADMILL        // SPORTS_TREADMILL
+            0x06 -> WorkoutKind.OUTDOOR_CYCLING  // SPORTS_OUTDOOR_CYCLING_V2
+            0x17 -> WorkoutKind.OUTDOOR_CYCLING  // SPORTS_OUTDOOR_CYCLING
+            0x07 -> WorkoutKind.INDOOR_CYCLING   // SPORTS_INDOOR_CYCLING
+            0x08 -> WorkoutKind.FREESTYLE        // SPORTS_FREESTYLE
+            0x09 -> WorkoutKind.POOL_SWIMMING    // SPORTS_POOL_SWIMMING
+            0x10 -> WorkoutKind.HIIT             // SPORTS_HIIT
+            0x0B -> WorkoutKind.ELLIPTICAL       // SPORTS_ELLIPTICAL
+            0x0D -> WorkoutKind.ROWING           // SPORTS_ROWING
+            0x0E -> WorkoutKind.JUMP_ROPE        // SPORTS_JUMP_ROPING
+            else -> WorkoutKind.OTHER
+        }
     }
 
     override fun clearAll() = SampleStore.clearAll()

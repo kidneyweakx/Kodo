@@ -17,6 +17,7 @@ import type {
   HeartRateSample,
   SleepSegment,
   StressSample,
+  WorkoutSummary,
 } from '../types';
 
 export interface HybridHealthStore
@@ -27,6 +28,9 @@ export interface HybridHealthStore
   getHeartRateSeries(dateIso: string): readonly HeartRateSample[];
   getStressSeries(dateIso: string): readonly StressSample[];
   getSleepSegments(dateIso: string): readonly SleepSegment[];
+
+  /** Recent workouts, newest first. `limit` defaults to 20. */
+  getRecentWorkouts(limit: number): readonly WorkoutSummary[];
 
   /** Drops all cached samples. Used by 'forget device' flow. */
   clearAll(): void;

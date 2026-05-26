@@ -13,6 +13,8 @@ package com.kidneyweakx.miband9active
 import android.content.Context
 import com.kidneyweakx.miband9active.xiaomi.activity.SleepStageSample
 import com.kidneyweakx.miband9active.xiaomi.activity.SleepSummary
+import com.kidneyweakx.miband9active.xiaomi.activity.WorkoutFields
+import com.kidneyweakx.miband9active.xiaomi.activity.XiaomiActivityFileId
 import com.kidneyweakx.miband9active.xiaomi.activity.XiaomiActivitySample
 import org.json.JSONArray
 import org.json.JSONObject
@@ -121,6 +123,52 @@ object SampleStore {
             }.getOrDefault(emptyList())
         } ?: emptyList()
         return summary to stages
+    }
+
+    /** Stored as a single JSON array keyed by `workouts`. Newest first. */
+    fun persistWorkout(fileId: XiaomiActivityFileId, fields: WorkoutFields) {
+        val sub = fileId.subtype
+        val obj = JSONObject().apply {
+            // Unique id from fileId timestamp + version (timestamps are 7-byte
+            // ms-resolution unique enough across a single device).
+            put("id", "${fileId.timestamp.time}-${fileId.version}-${sub.code}")
+            put("subtype", sub.code)
+            put("subtypeName", sub.name)
+            put("version", fileId.version)
+            put("startSec", fields.timeStartEpochSec ?: (fileId.timestamp.time / 1000))
+            fields.timeEndEpochSec?.let { put("endSec", it) }
+            fields.activeSeconds?.let { put("activeSec", it) }
+            fields.calories?.let { put("kcal", it) }
+            fields.distanceMeters?.let { put("distM", it) }
+            fields.hrAvg?.let { put("hrAvg", it) }
+            fields.hrMax?.let { put("hrMax", it) }
+            fields.hrMin?.let { put("hrMin", it) }
+            fields.steps?.let { put("steps", it) }
+        }
+        val key = "workouts"
+        val arr = JSONArray(prefs().getString(key, "[]"))
+        // De-duplicate by id.
+        val existingId = obj.getString("id")
+        val out = JSONArray()
+        out.put(obj)
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            if (o.optString("id") != existingId) out.put(o)
+        }
+        // Cap at 500 most-recent entries.
+        val capped = if (out.length() > 500) JSONArray().also { c ->
+            for (i in 0 until 500) c.put(out.get(i))
+        } else out
+        prefs().edit().putString(key, capped.toString()).apply()
+    }
+
+    fun loadRecentWorkouts(limit: Int): List<JSONObject> {
+        val raw = prefs().getString("workouts", null) ?: return emptyList()
+        return runCatching {
+            val arr = JSONArray(raw)
+            val n = minOf(limit, arr.length())
+            (0 until n).map { arr.getJSONObject(it) }
+        }.getOrDefault(emptyList())
     }
 
     fun clearAll() {

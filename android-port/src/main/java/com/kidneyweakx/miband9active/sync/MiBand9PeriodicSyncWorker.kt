@@ -96,6 +96,7 @@ class MiBand9PeriodicSyncWorker(
                     val dayIso = parsed.fileId.timestamp.toInstant().toString().substring(0, 10)
                     SampleStore.persistSleep(dayIso, parsed.sleep.summary, parsed.sleep.stages)
                 }
+                is ParsedActivityFile.Workout -> SampleStore.persistWorkout(parsed.fileId, parsed.fields)
                 is ParsedActivityFile.Unknown -> Unit
             }
         }
