@@ -166,25 +166,23 @@ export function ActivityRings({
         pointerEvents="none"
         style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center' }}
       >
-        <ThemedText
-          variant="caption"
-          tone="tertiary"
-          style={{ letterSpacing: 1.2 }}
-        >
+        <ThemedText variant="eyebrow" tone="tertiary">
           {synced ? 'TODAY · 今日' : 'NOT SYNCED · 未同步'}
         </ThemedText>
         <ThemedText
           style={{
-            ...Typography.hero,
+            ...Typography.displayXL,
             ...tabularNums,
             color: theme.text.primary,
-            marginTop: Spacing.xs,
+            marginTop: 2,
           }}
         >
           {synced && steps ? steps.value.toLocaleString() : '—'}
         </ThemedText>
-        <ThemedText variant="bodyMedium" tone="secondary">
-          {synced && steps ? `${steps.unit ?? 'steps'} · 目標 ${steps.goal.toLocaleString()}` : 'steps'}
+        <ThemedText variant="caption" tone="secondary" style={{ letterSpacing: 1, marginTop: 2 }}>
+          {synced && steps
+            ? `${(steps.unit ?? 'STEPS').toUpperCase()} · / ${steps.goal.toLocaleString()}`
+            : 'STEPS'}
         </ThemedText>
       </View>
     </View>

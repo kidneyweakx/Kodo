@@ -45,15 +45,19 @@ export const Size = {
 } as const;
 
 export const Typography = {
-  hero: { fontSize: 64, lineHeight: 68, fontWeight: '800', letterSpacing: -1.5 },
-  displayLarge: { fontSize: 48, lineHeight: 52, fontWeight: '700', letterSpacing: -0.8 },
-  displayMedium: { fontSize: 36, lineHeight: 42, fontWeight: '700', letterSpacing: -0.5 },
+  /** For the activity-ring centre numeral. */
+  displayXL: { fontSize: 72, lineHeight: 74, fontWeight: '800', letterSpacing: -2 },
+  hero: { fontSize: 56, lineHeight: 60, fontWeight: '800', letterSpacing: -1.5 },
+  displayLarge: { fontSize: 44, lineHeight: 48, fontWeight: '700', letterSpacing: -0.8 },
+  displayMedium: { fontSize: 32, lineHeight: 38, fontWeight: '700', letterSpacing: -0.5 },
   headlineLarge: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: -0.3 },
   headlineMedium: { fontSize: 22, lineHeight: 28, fontWeight: '600', letterSpacing: -0.2 },
   titleLarge: { fontSize: 18, lineHeight: 24, fontWeight: '600' },
   titleMedium: { fontSize: 16, lineHeight: 22, fontWeight: '600' },
   bodyLarge: { fontSize: 16, lineHeight: 24, fontWeight: '400' },
   bodyMedium: { fontSize: 14, lineHeight: 20, fontWeight: '400' },
+  /** Tight uppercase eyebrow style used in cards and section headers. */
+  eyebrow: { fontSize: 11, lineHeight: 14, fontWeight: '600', letterSpacing: 1.4 },
   caption: { fontSize: 12, lineHeight: 16, fontWeight: '500', letterSpacing: 0.6 },
   micro: { fontSize: 10, lineHeight: 14, fontWeight: '600', letterSpacing: 0.8 },
 } satisfies Record<string, TextStyle>;

@@ -66,6 +66,12 @@ export const cache = {
 export const cacheKeys = {
   pairedBand: 'paired-band',
   onboardingDone: 'onboarding-done',
+  onboardingBatterySeen: 'onboarding-battery-seen',
+  /** UI-side preferences mirrored to band where possible. */
+  use24HourClock: 'pref:use24h',
+  stepGoal: 'pref:step-goal',
+  heartRateInterval: 'pref:hr-interval',
+  autoSyncIntervalMin: 'pref:auto-sync-min',
   language: 'language',
   themeId: 'theme-id',
   themeMode: 'theme-mode',

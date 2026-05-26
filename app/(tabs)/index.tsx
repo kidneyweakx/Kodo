@@ -5,12 +5,12 @@
  * AGPL-3.0-or-later. See LICENSE, NOTICE.md.
  *
  * Layout (top → bottom):
- *   1. Header eyebrow + band name
+ *   1. Eyebrow + brand title + connection chip
  *   2. SyncStatusBar (pulses + scanning beam while syncing)
- *   3. ActivityRings (Apple/Garmin-style triple ring, no value = ghost rings)
- *   4. RingLegend
- *   5. MetricCard list (HR / Sleep / Stress / SpO₂ / PAI)
- *   6. Floating StickyActionDock at the bottom — Sync now / GO
+ *   3. ActivityRings (Apple-style triple ring, ghost when no sync) + RingLegend
+ *   4. Bento grid 2×2: HR / Sleep / Stress / SpO₂
+ *   5. PAI hero card (wide)
+ *   6. Floating StickyActionDock — Sync now / GO
  *
  * Render-path contract: initial state seeds from MMKV via getSync (rule 10).
  * Empty/cold = '—' + "尚未同步", never a faked number (rule 8).
@@ -21,16 +21,18 @@ import { ScrollView, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Spacing } from '@/constants/DesignSystem';
-import { ThemedText } from '@/components/themed';
+import { Radius, Spacing } from '@/constants/DesignSystem';
+import { ThemedSurface, ThemedText } from '@/components/themed';
 import { useTheme } from '@/context/ThemeContext';
 import { AmbientBlobs } from '@/components/dashboard/AmbientBlobs';
 import { ActivityRings, RingLegend } from '@/components/dashboard/ActivityRings';
+import { MetricBento } from '@/components/dashboard/MetricBento';
 import { MetricCard } from '@/components/dashboard/MetricCard';
+import { RecentWorkoutsCard } from '@/components/dashboard/RecentWorkoutsCard';
 import { StickyActionDock } from '@/components/dashboard/StickyActionDock';
 import { SyncStatusBar } from '@/components/dashboard/SyncStatusBar';
-import { bandLink, usePairedBand } from '@/libs/services/bandLink';
-import { useDashboardSummary } from '@/libs/services/healthStore';
+import { bandLink, useBatteryInfo, useConnectionState, usePairedBand } from '@/libs/services/bandLink';
+import { useDashboardSummary, useRecentWorkouts } from '@/libs/services/healthStore';
 import { useSyncStatus } from '@/libs/services/syncStatus';
 import { t } from '@/libs/services/i18n';
 import { cache, cacheKeys } from '@/libs/services/cache';
@@ -50,10 +52,20 @@ const STEP_GOAL = 8_000;
 const SLEEP_GOAL_MINUTES = 8 * 60;
 const VITALITY_GOAL = 100;
 
+const localizedDate = () => {
+  const d = new Date();
+  const md = d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+  const wd = d.toLocaleDateString('en-US', { weekday: 'short' });
+  return `${md.toUpperCase()} · ${wd.toUpperCase()}`;
+};
+
 export default function TodayScreen() {
   const { theme } = useTheme();
   const paired = usePairedBand();
+  const battery = useBatteryInfo();
+  const connectionState = useConnectionState();
   const dashboard = useDashboardSummary();
+  const workouts = useRecentWorkouts(10);
   const syncStatus = useSyncStatus();
   const lastSync = cache.getSync<string>(cacheKeys.lastSyncAt);
 
@@ -74,52 +86,60 @@ export default function TodayScreen() {
     };
   }, [dashboard.summary]);
 
-  const cards = useMemo(() => {
+  const bentos = useMemo(() => {
     const s = dashboard.summary;
     const state: 'ready' | 'loading' | 'unsynced' = s
       ? 'ready'
       : dashboard.state === 'cold'
         ? 'unsynced'
         : 'loading';
-    return [
+    type Card = {
+      label: string;
+      value: string | null;
+      unit?: string;
+      hint?: string;
+      tone: 'accent' | 'success' | 'warning' | 'danger' | 'neutral';
+    };
+    const cards = [
       {
-        label: t('dashboard.heartRate'),
+        label: 'Heart · 心率',
         value: s?.restingHeartRate != null ? String(s.restingHeartRate) : null,
         unit: 'bpm',
-        hint: 'Resting',
-        tone: 'danger' as const,
-        state,
+        hint: 'Resting · 靜息',
+        tone: 'danger',
       },
       {
-        label: t('dashboard.sleep'),
+        label: 'Sleep · 睡眠',
         value:
           s?.sleepMinutes != null
-            ? `${Math.floor(s.sleepMinutes / 60)}h ${s.sleepMinutes % 60}m`
+            ? `${Math.floor(s.sleepMinutes / 60)}h${String(s.sleepMinutes % 60).padStart(2, '0')}`
             : null,
-        tone: 'success' as const,
-        state,
+        hint: 'Last night · 昨夜',
+        tone: 'success',
       },
       {
-        label: t('dashboard.stress'),
+        label: 'Stress · 壓力',
         value: s?.stressAverage != null ? String(s.stressAverage) : null,
         unit: '/100',
-        tone: 'warning' as const,
-        state,
+        hint: 'Average · 平均',
+        tone: 'warning',
       },
       {
-        label: t('dashboard.spo2'),
+        label: 'SpO₂ · 血氧',
         value: s?.spo2Average != null ? `${s.spo2Average}` : null,
         unit: '%',
-        tone: 'accent' as const,
-        state,
+        hint: 'Average · 平均',
+        tone: 'accent',
       },
-      {
-        label: t('dashboard.pai'),
-        value: s?.paiScore != null ? String(s.paiScore) : null,
-        tone: 'success' as const,
-        state,
-      },
-    ];
+    ] as const satisfies readonly Card[];
+    const pai: Card = {
+      label: 'PAI Vitality · 活力指數',
+      value: s?.paiScore != null ? String(s.paiScore) : null,
+      unit: '/100',
+      hint: '7-day rolling · 七日累計',
+      tone: 'success',
+    };
+    return { state, cards, pai };
   }, [dashboard]);
 
   const onSync = async () => {
@@ -134,24 +154,82 @@ export default function TodayScreen() {
     // Placeholder; a future Workout route can subscribe to HybridGpsTracker.
   };
 
+  const connectionLabel =
+    connectionState === 'connected'
+      ? 'LINKED · 已連線'
+      : connectionState === 'connecting' || connectionState === 'authenticating'
+        ? 'CONNECTING · 連線中'
+        : connectionState === 'scanning'
+          ? 'SCANNING · 掃描中'
+          : connectionState === 'error'
+            ? 'ERROR · 失敗'
+            : 'OFFLINE · 未連線';
+
+  const connectionTone =
+    connectionState === 'connected'
+      ? theme.success
+      : connectionState === 'error'
+        ? theme.danger
+        : theme.text.tertiary;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.background.primary }} edges={['top']}>
       <AmbientBlobs />
       <ScrollView
-        contentContainerStyle={{ padding: Spacing.xl, paddingBottom: 200, gap: Spacing.xl }}
+        contentContainerStyle={{
+          paddingHorizontal: Spacing.lg,
+          paddingTop: Spacing.lg,
+          paddingBottom: 220,
+          gap: Spacing.xl,
+        }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Header */}
         <Animated.View entering={FadeInDown.duration(360)}>
-          <ThemedText variant="caption" tone="accent" style={{ letterSpacing: 1.4 }}>
-            {t('dashboard.title').toUpperCase()} · {new Date().toLocaleDateString()}
-          </ThemedText>
-          <ThemedText variant="headlineLarge" style={{ marginTop: Spacing.xs }}>
-            {paired?.name ?? t('app.name')}
-          </ThemedText>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <View style={{ flex: 1, gap: 2 }}>
+              <ThemedText variant="eyebrow" tone="accent">
+                {localizedDate()}
+              </ThemedText>
+              <ThemedText variant="headlineLarge">
+                {paired?.name ?? t('app.name')}
+              </ThemedText>
+            </View>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingVertical: 6,
+                paddingHorizontal: Spacing.md,
+                borderRadius: Radius.pill,
+                backgroundColor: `${connectionTone}22`,
+              }}
+            >
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: connectionTone,
+                }}
+              />
+              <ThemedText variant="caption" style={{ color: connectionTone, letterSpacing: 1 }}>
+                {connectionLabel}
+              </ThemedText>
+            </View>
+          </View>
         </Animated.View>
 
         <SyncStatusBar />
 
+        {/* Hero rings */}
         <View style={{ alignItems: 'center' }}>
           <ActivityRings
             steps={ringValues.steps}
@@ -166,21 +244,91 @@ export default function TodayScreen() {
           />
         </View>
 
-        <View style={{ gap: Spacing.md }}>
-          {cards.map((c, i) => (
-            <MetricCard
-              key={c.label}
-              label={c.label}
-              value={c.value}
-              unit={c.unit}
-              hint={c.hint}
-              tone={c.tone}
-              state={c.state}
-              samples={[]}
-              delay={80 + i * 60}
-            />
-          ))}
+        {/* Section heading */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: Spacing.sm,
+            marginTop: -Spacing.md,
+          }}
+        >
+          <ThemedText variant="eyebrow" tone="tertiary">
+            VITALS · 體徵
+          </ThemedText>
+          <View style={{ flex: 1, height: 1, backgroundColor: theme.glassBorder, opacity: 0.5 }} />
         </View>
+
+        {/* Bento 2×2 */}
+        <View style={{ gap: Spacing.md }}>
+          <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+            <MetricBento {...bentos.cards[0]} state={bentos.state} delay={60} />
+            <MetricBento {...bentos.cards[1]} state={bentos.state} delay={120} />
+          </View>
+          <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+            <MetricBento {...bentos.cards[2]} state={bentos.state} delay={180} />
+            <MetricBento {...bentos.cards[3]} state={bentos.state} delay={240} />
+          </View>
+        </View>
+
+        {/* PAI hero (wide card) */}
+        <MetricCard
+          label={bentos.pai.label}
+          value={bentos.pai.value}
+          unit={bentos.pai.unit}
+          hint={bentos.pai.hint}
+          tone="success"
+          state={bentos.state}
+          samples={[]}
+          delay={300}
+        />
+
+        {/* Recent workouts */}
+        <RecentWorkoutsCard workouts={workouts} delay={360} />
+
+        {/* Band status card — battery + last sync, when known */}
+        {(battery || lastSync) && (
+          <ThemedSurface variant="elevated" padded="lg" radius="lg">
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <View style={{ gap: 4 }}>
+                <ThemedText variant="eyebrow" tone="tertiary">
+                  BAND · 手環
+                </ThemedText>
+                <ThemedText variant="titleLarge">
+                  {paired?.name ?? 'Mi Band 9 Active'}
+                </ThemedText>
+                <ThemedText variant="caption" tone="tertiary">
+                  {lastSync ? formatRelative(lastSync) : t('common.unsynced')}
+                </ThemedText>
+              </View>
+              {battery && (
+                <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
+                    <ThemedText variant="displayMedium" style={{ color: theme.text.primary }}>
+                      {Math.round(battery.percent)}
+                    </ThemedText>
+                    <ThemedText variant="titleMedium" tone="secondary">
+                      %
+                    </ThemedText>
+                  </View>
+                  <ThemedText
+                    variant="caption"
+                    tone={battery.charging ? 'accent' : 'tertiary'}
+                    style={{ letterSpacing: 1 }}
+                  >
+                    {battery.charging ? '⚡ CHARGING · 充電中' : 'BATTERY · 電量'}
+                  </ThemedText>
+                </View>
+              )}
+            </View>
+          </ThemedSurface>
+        )}
       </ScrollView>
 
       <StickyActionDock

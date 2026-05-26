@@ -8,6 +8,7 @@
 import { Tabs } from 'expo-router';
 import { Platform, View } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Spacing } from '@/constants/DesignSystem';
 import { useTheme } from '@/context/ThemeContext';
@@ -42,6 +43,12 @@ function TabDot({ focused }: { readonly focused: boolean }) {
 
 export default function TabsLayout() {
   const { theme, resolvedMode } = useTheme();
+  const insets = useSafeAreaInsets();
+  // Total tab bar height = tab content (60) + system gesture/3-button nav.
+  // On gesture nav inset is ~20, on 3-button it's ~48; either way we let
+  // SafeArea decide so we never bury the labels under the Android nav bar.
+  const tabContentHeight = 60;
+  const tabBarHeight = tabContentHeight + insets.bottom;
   return (
     <Tabs
       screenOptions={{
@@ -56,9 +63,9 @@ export default function TabsLayout() {
             default: 'transparent',
           }),
           borderTopColor: theme.glassBorder,
-          height: 76,
+          height: tabBarHeight,
           paddingTop: Spacing.sm,
-          paddingBottom: Spacing.md,
+          paddingBottom: insets.bottom + Spacing.xs,
         },
         tabBarBackground: () => (
           <BlurView

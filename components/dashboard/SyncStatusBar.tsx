@@ -9,7 +9,7 @@
  */
 
 import { useEffect } from 'react';
-import { Pressable, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 import Animated, {
   Easing,
   interpolate,
@@ -19,7 +19,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { Motion, Radius, Spacing } from '@/constants/DesignSystem';
+import { Motion, Radius, Spacing, tabularNums } from '@/constants/DesignSystem';
 import { ThemedText } from '@/components/themed';
 import { useTheme } from '@/context/ThemeContext';
 import { bandLink } from '@/libs/services/bandLink';
@@ -107,12 +107,20 @@ export function SyncStatusBar() {
   }));
 
   const onTap = async () => {
+    if (isSyncing) {
+      console.log('[SyncStatusBar] sync already in progress — ignoring tap');
+      return;
+    }
     void hapticsBridge.fire('tap');
+    console.log('[SyncStatusBar] sync tapped');
     try {
       const since = new Date(Date.now() - 86_400_000).toISOString();
-      await bandLink.syncSince(since);
-    } catch {
-      // Native side may not be loaded — ignore in dev.
+      const count = await bandLink.syncSince(since);
+      console.log('[SyncStatusBar] sync OK, files=', count);
+    } catch (e) {
+      console.warn('[SyncStatusBar] sync failed:', e);
+      const msg = e instanceof Error ? e.message : String(e);
+      Alert.alert('Sync failed', msg);
     }
   };
 
@@ -187,18 +195,46 @@ export function SyncStatusBar() {
             ]}
           />
         </View>
-        <View style={{ flex: 1 }}>
-          <ThemedText variant="caption" tone="secondary" style={{ letterSpacing: 1 }}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <ThemedText variant="eyebrow" tone="tertiary">
             {isSyncing
-              ? phaseLabel[status.phase] ?? status.label
+              ? (phaseLabel[status.phase] ?? status.label)
               : isError
-                ? `${phaseLabel.error} · ${status.errorMessage ?? ''}`
-                : `LAST SYNC · ${formatRelative(status.lastSyncedAt).toUpperCase()}`}
+                ? phaseLabel.error
+                : 'LAST SYNC · 上次同步'}
+          </ThemedText>
+          <ThemedText
+            variant="titleMedium"
+            tone={isError ? 'error' : 'primary'}
+            style={tabularNums}
+          >
+            {isSyncing
+              ? `${Math.round(status.progress * 100)}%`
+              : isError
+                ? (status.errorMessage ?? 'Failed')
+                : formatRelative(status.lastSyncedAt)}
           </ThemedText>
         </View>
-        <ThemedText variant="caption" tone={isError ? 'error' : 'accent'}>
-          {isSyncing ? `${Math.round(status.progress * 100)}%` : 'TAP TO SYNC'}
-        </ThemedText>
+        <View
+          style={{
+            paddingHorizontal: Spacing.md,
+            paddingVertical: 6,
+            borderRadius: Radius.pill,
+            backgroundColor: isError
+              ? `${theme.danger}22`
+              : isSyncing
+                ? `${accent}22`
+                : `${accent}1A`,
+          }}
+        >
+          <ThemedText
+            variant="caption"
+            tone={isError ? 'error' : 'accent'}
+            style={{ letterSpacing: 1 }}
+          >
+            {isSyncing ? 'SYNCING' : 'TAP TO SYNC'}
+          </ThemedText>
+        </View>
       </Animated.View>
     </Pressable>
   );
