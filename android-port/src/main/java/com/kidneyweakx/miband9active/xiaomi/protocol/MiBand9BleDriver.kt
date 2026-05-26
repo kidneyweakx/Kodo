@@ -83,9 +83,14 @@ class MiBand9BleDriver(
     private val authSession = XiaomiAuthSession(authKey16)
 
     private val packetAccumulator = V2PacketAccumulator()
-    private val sequenceCounter = AtomicInteger(1)
+    // Counter for Data packets only. Matches Gadgetbridge V2:
+    //   - SessionConfig START_SESSION_REQUEST seq is hardcoded 0 (doesn't bump)
+    //   - Data packets use getAndIncrement() starting from 0
+    private val sequenceCounter = AtomicInteger(0)
     private val pendingAcks = ConcurrentHashMap<Int, CompletableDeferred<Unit>>()
     private val writeChannel = Channel<ByteArray>(capacity = Channel.UNLIMITED)
+    /** Buffered to 1: pumpWrites awaits this after each WRITE_TYPE_DEFAULT write. */
+    private val writeAck = Channel<Int>(capacity = 1)
 
     private var gatt: BluetoothGatt? = null
     private var txChar: BluetoothGattCharacteristic? = null
@@ -94,11 +99,16 @@ class MiBand9BleDriver(
     /** Connect, run V2 session config + auth, then resolve State.Connected. */
     @SuppressLint("MissingPermission")
     fun connect(device: BluetoothDevice) {
-        if (gattScope != null) return
+        if (gattScope != null) {
+            Log.w(TAG, "connect() called but gattScope is non-null — ignoring re-entry")
+            return
+        }
+        Log.i(TAG, "connect() device=${device.address} authKey=${authKey16.size}B")
         _state.value = State.Connecting
 
         val cb = object : BluetoothGattCallback() {
             override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
+                Log.i(TAG, "onConnectionStateChange status=$status newState=$newState")
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
                     g.requestMtu(512)
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
@@ -108,6 +118,7 @@ class MiBand9BleDriver(
             }
 
             override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
+                Log.i(TAG, "onMtuChanged mtu=$mtu status=$status (maxWriteSize=${(mtu - 3).coerceAtLeast(23)})")
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     maxWriteSize = (mtu - 3).coerceAtLeast(23)
                 }
@@ -115,10 +126,12 @@ class MiBand9BleDriver(
             }
 
             override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
+                Log.i(TAG, "onServicesDiscovered status=$status services=${g.services?.size ?: 0}")
                 val service = g.getService(XiaomiUuids.SERVICE_V2)
                 val rx = service?.getCharacteristic(XiaomiUuids.V2_CHARACTERISTIC_RX)
                 val tx = service?.getCharacteristic(XiaomiUuids.V2_CHARACTERISTIC_TX)
                 if (service == null || rx == null || tx == null) {
+                    Log.e(TAG, "V2 service or characteristics missing (service=$service rx=$rx tx=$tx). All services: ${g.services?.map { it.uuid }}")
                     _state.value = State.Error("V2 service or characteristics missing")
                     return
                 }
@@ -127,6 +140,7 @@ class MiBand9BleDriver(
                 g.setCharacteristicNotification(rx, true)
                 val ccc = rx.getDescriptor(XiaomiUuids.CCC_DESCRIPTOR)
                 if (ccc != null) {
+                    Log.d(TAG, "writeDescriptor(CCC, ENABLE_NOTIFICATION_VALUE)")
                     if (Build.VERSION.SDK_INT >= 33) {
                         g.writeDescriptor(ccc, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
                     } else {
@@ -135,13 +149,38 @@ class MiBand9BleDriver(
                         @Suppress("DEPRECATION")
                         g.writeDescriptor(ccc)
                     }
+                } else {
+                    Log.w(TAG, "RX has no CCC descriptor — notifications won't be enabled")
+                    // No descriptor to wait on — kick auth immediately.
+                    _state.value = State.Authenticating
+                    Log.i(TAG, "→ Authenticating, kicking startSessionAndAuth()")
+                    startSessionAndAuth()
                 }
-                _state.value = State.Authenticating
-                startSessionAndAuth()
             }
 
             override fun onDescriptorWrite(g: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
-                // notify enabled
+                Log.d(TAG, "onDescriptorWrite uuid=${descriptor.uuid} status=$status")
+                // CCC notification subscribe ack — only NOW is the GATT stack
+                // free to accept our first characteristic write. Firing the
+                // session start before this returns ERROR_GATT_WRITE_REQUEST_BUSY (rc=201)
+                // and the band never sees the request.
+                if (descriptor.uuid == XiaomiUuids.CCC_DESCRIPTOR && status == BluetoothGatt.GATT_SUCCESS) {
+                    if (_state.value !is State.Authenticating &&
+                        _state.value !is State.Connected) {
+                        _state.value = State.Authenticating
+                        Log.i(TAG, "→ Authenticating (after CCC ack), kicking startSessionAndAuth()")
+                        startSessionAndAuth()
+                    }
+                }
+            }
+
+            override fun onCharacteristicWrite(
+                g: BluetoothGatt,
+                characteristic: BluetoothGattCharacteristic,
+                status: Int,
+            ) {
+                Log.d(TAG, "onCharacteristicWrite status=$status uuid=${characteristic.uuid}")
+                writeAck.trySend(status)
             }
 
             override fun onCharacteristicChanged(
@@ -149,6 +188,7 @@ class MiBand9BleDriver(
                 characteristic: BluetoothGattCharacteristic,
                 value: ByteArray,
             ) {
+                Log.d(TAG, "rx ${value.size}B: ${value.take(16).joinToString(" ") { "%02x".format(it) }}${if (value.size > 16) "…" else ""}")
                 onIncomingBytes(value)
             }
 
@@ -156,6 +196,7 @@ class MiBand9BleDriver(
             override fun onCharacteristicChanged(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
                 @Suppress("DEPRECATION")
                 val data = characteristic.value ?: return
+                Log.d(TAG, "rx(legacy) ${data.size}B")
                 onIncomingBytes(data)
             }
         }
@@ -202,11 +243,11 @@ class MiBand9BleDriver(
     private fun handlePacket(packet: XiaomiSppPacketV2) {
         when (packet) {
             is XiaomiSppPacketV2.Ack -> {
+                Log.d(TAG, "← Ack seq=${packet.sequenceNumber}")
                 pendingAcks.remove(packet.sequenceNumber)?.complete(Unit)
             }
             is XiaomiSppPacketV2.SessionConfig -> {
-                // The watch responds to our START_SESSION_REQUEST with a
-                // START_SESSION_RESPONSE; we kick off auth from there.
+                Log.i(TAG, "← SessionConfig opCode=${packet.opCode} seq=${packet.sequenceNumber}")
                 if (packet.opCode == XiaomiSppPacketV2.SessionConfig.OPCODE_START_SESSION_RESPONSE) {
                     sendPhoneNonce()
                 }
@@ -214,7 +255,12 @@ class MiBand9BleDriver(
             is XiaomiSppPacketV2.Data -> {
                 sendAck(packet.sequenceNumber)
                 val plain = packet.decryptedPayload(authSession)
-                val cmd = runCatching { XiaomiProto.Command.parseFrom(plain) }.getOrNull() ?: return
+                val cmd = runCatching { XiaomiProto.Command.parseFrom(plain) }.getOrNull()
+                if (cmd == null) {
+                    Log.w(TAG, "← Data seq=${packet.sequenceNumber} channel=${packet.channel} but Command.parseFrom failed (${plain.size}B)")
+                    return
+                }
+                Log.d(TAG, "← Data seq=${packet.sequenceNumber} channel=${packet.channel} cmd type=${cmd.type} subtype=${cmd.subtype}")
                 onCommandReceived(cmd, packet.channel)
             }
         }
@@ -226,11 +272,12 @@ class MiBand9BleDriver(
 
     private fun startSessionAndAuth() {
         scope.launch {
-            // 1) START_SESSION_REQUEST (plaintext, no auth yet)
+            // 1) START_SESSION_REQUEST — Gadgetbridge hardcodes seq=0 here.
             val req = XiaomiSppPacketV2.SessionConfig(
-                seq = nextSeq(),
+                seq = 0,
                 opCode = XiaomiSppPacketV2.SessionConfig.OPCODE_START_SESSION_REQUEST,
             )
+            Log.i(TAG, "→ START_SESSION_REQUEST seq=${req.sequenceNumber}")
             writeRawFrame(req.encode(null))
         }
     }
@@ -293,7 +340,10 @@ class MiBand9BleDriver(
         if (cmd.type == 1 && (cmd.subtype == 27 || cmd.subtype == 5)) {
             _state.value = State.Connected
             // proactively ask for device info + battery now
-            scope.launch { sendCommand(SystemCommands.COMMAND_TYPE, SystemCommands.CMD_DEVICE_INFO) }
+            scope.launch {
+                sendCommand(SystemCommands.COMMAND_TYPE, SystemCommands.CMD_DEVICE_INFO)
+                sendCommand(SystemCommands.COMMAND_TYPE, SystemCommands.CMD_BATTERY)
+            }
             return
         }
         _incoming.tryEmit(IncomingCommand(cmd.type, cmd.subtype, cmd))
@@ -342,16 +392,65 @@ class MiBand9BleDriver(
     @SuppressLint("MissingPermission")
     private suspend fun pumpWrites() {
         for (chunk in writeChannel) {
-            val g = gatt ?: continue
-            val tx = txChar ?: continue
+            val g = gatt
+            val tx = txChar
+            if (g == null || tx == null) {
+                Log.w(TAG, "pumpWrites: dropping ${chunk.size}B chunk (gatt=${g != null} txChar=${tx != null})")
+                continue
+            }
+            // Pick the write type that the characteristic actually supports.
+            // Mi Band 9 Active's V2 TX (0000005f) is declared PROPERTY_WRITE
+            // (write-with-response); writing it as WRITE_NO_RESPONSE makes
+            // the stack silently drop frames → band never sees our request →
+            // auth stalls forever in Authenticating.
+            val props = tx.properties
+            val writeType = when {
+                (props and BluetoothGattCharacteristic.PROPERTY_WRITE) != 0 ->
+                    BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                (props and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE) != 0 ->
+                    BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                else -> BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            }
+            // Drain any stale ack before dispatching this write so we never
+            // satisfy a new wait with a previous chunk's callback.
+            while (writeAck.tryReceive().isSuccess) Unit
             try {
+                Log.d(
+                    TAG,
+                    "tx ${chunk.size}B writeType=$writeType props=0x${"%02x".format(props)}: ${chunk.take(16).joinToString(" ") { "%02x".format(it) }}${if (chunk.size > 16) "…" else ""}",
+                )
                 if (Build.VERSION.SDK_INT >= 33) {
-                    g.writeCharacteristic(tx, chunk, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
+                    val rc = g.writeCharacteristic(tx, chunk, writeType)
+                    if (rc != BluetoothGatt.GATT_SUCCESS) {
+                        Log.w(TAG, "writeCharacteristic returned non-success rc=$rc")
+                        continue
+                    }
                 } else {
                     @Suppress("DEPRECATION")
                     tx.value = chunk
                     @Suppress("DEPRECATION")
-                    g.writeCharacteristic(tx)
+                    tx.writeType = writeType
+                    @Suppress("DEPRECATION")
+                    val ok = g.writeCharacteristic(tx)
+                    if (!ok) {
+                        Log.w(TAG, "writeCharacteristic returned false")
+                        continue
+                    }
+                }
+                // WRITE_TYPE_DEFAULT must be ack'd by onCharacteristicWrite
+                // before the next write can be issued, otherwise the stack
+                // returns GATT_BUSY. Wait up to 2s per chunk.
+                if (writeType == BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) {
+                    val ack = try {
+                        kotlinx.coroutines.withTimeoutOrNull(2_000) { writeAck.receive() }
+                    } catch (_: Throwable) {
+                        null
+                    }
+                    if (ack == null) {
+                        Log.w(TAG, "no onCharacteristicWrite ack within 2s — band may have dropped")
+                    } else if (ack != BluetoothGatt.GATT_SUCCESS) {
+                        Log.w(TAG, "onCharacteristicWrite status=$ack (non-success)")
+                    }
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "write failed", t)
