@@ -6,13 +6,14 @@
  */
 
 import { Tabs } from 'expo-router';
-import { Platform, View } from 'react-native';
+import { Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Spacing } from '@/constants/DesignSystem';
 import { useTheme } from '@/context/ThemeContext';
 import { ThemedText } from '@/components/themed';
+import { NotificationsIcon, SettingsIcon, TodayIcon } from '@/components/brand/TabIcons';
 
 function TabBarLabel({ label, focused }: { readonly label: string; readonly focused: boolean }) {
   return (
@@ -23,21 +24,6 @@ function TabBarLabel({ label, focused }: { readonly label: string; readonly focu
     >
       {label}
     </ThemedText>
-  );
-}
-
-function TabDot({ focused }: { readonly focused: boolean }) {
-  const { theme } = useTheme();
-  return (
-    <View
-      style={{
-        width: focused ? 14 : 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: focused ? theme.accent : theme.text.tertiary,
-        marginTop: 4,
-      }}
-    />
   );
 }
 
@@ -80,7 +66,7 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Today',
-          tabBarIcon: ({ focused }) => <TabDot focused={focused} />,
+          tabBarIcon: ({ focused, color }) => <TodayIcon focused={focused} color={typeof color === 'string' ? color : undefined} size={24} />,
           tabBarLabel: ({ focused }) => <TabBarLabel label="Today / 今日" focused={focused} />,
         }}
       />
@@ -88,7 +74,7 @@ export default function TabsLayout() {
         name="notifications"
         options={{
           title: 'Notifications',
-          tabBarIcon: ({ focused }) => <TabDot focused={focused} />,
+          tabBarIcon: ({ focused, color }) => <NotificationsIcon focused={focused} color={typeof color === 'string' ? color : undefined} size={24} />,
           tabBarLabel: ({ focused }) => <TabBarLabel label="通知 / Notif" focused={focused} />,
         }}
       />
@@ -96,7 +82,7 @@ export default function TabsLayout() {
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ focused }) => <TabDot focused={focused} />,
+          tabBarIcon: ({ focused, color }) => <SettingsIcon focused={focused} color={typeof color === 'string' ? color : undefined} size={24} />,
           tabBarLabel: ({ focused }) => <TabBarLabel label="設定 / Settings" focused={focused} />,
         }}
       />
