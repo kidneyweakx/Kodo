@@ -1,84 +1,85 @@
-/*  Copyright (C) 2023-2024 Andreas Shimokawa, José Rebelo         (Gadgetbridge)
- *  Copyright (C) 2026 kidneyweakx                                   (Kotlin port, slimmed)
+/*  Copyright (C) 2023-2024 José Rebelo, Yoran Vulker                         (Gadgetbridge)
  *
- *  AGPL-3.0-or-later. See LICENSE, NOTICE.md.
+ * mi-band-9-active — a slim Mi Band 9 Active companion app
+ * Copyright (C) 2026 kidneyweakx
  *
- *  Accumulates [total uint16 LE][current uint16 LE][payload] chunks coming
- *  off the band's ACTIVITY channel and emits parsed files via [onFile] when
- *  `current == total` and the payload's trailing CRC-32 is valid.
+ * Portions ported from Gadgetbridge (AGPL-3.0-or-later) — see NOTICE.md
  *
- *  Translated from `XiaomiActivityFileFetcher.java`, dropping the GBDevice /
- *  per-device priority-queue scaffolding (we sync one band at a time).
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * Chunk reassembly half of `XiaomiActivityFileFetcher.java`. Each
+ * ACTIVITY-channel payload is `[total u16 LE][num u16 LE][bytes…]`; `num == 1`
+ * resets the buffer, `num == total` completes the file, whose last 4 bytes
+ * are a CRC-32 (LE) over everything before them. The request queue / ack /
+ * timeout half lives in `sync/ActivitySync.kt` (coroutines instead of a
+ * main-looper Handler).
  */
 package com.kidneyweakx.miband9active.xiaomi.activity
 
+import android.util.Log
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.zip.CRC32
 
-sealed class ParsedActivityFile {
-    data class DailySamples(val fileId: XiaomiActivityFileId, val samples: List<XiaomiActivitySample>) : ParsedActivityFile()
-    data class Sleep(val fileId: XiaomiActivityFileId, val sleep: SleepFile) : ParsedActivityFile()
-    data class Workout(val fileId: XiaomiActivityFileId, val fields: WorkoutFields) : ParsedActivityFile()
-    data class Unknown(val fileId: XiaomiActivityFileId, val raw: ByteArray) : ParsedActivityFile()
-
-    fun fileId(): XiaomiActivityFileId = when (this) {
-        is DailySamples -> fileId
-        is Sleep -> fileId
-        is Workout -> fileId
-        is Unknown -> fileId
-    }
-}
-
 class XiaomiActivityFileFetcher {
 
-    private var buffer = ByteArrayOutputStream()
-    /** Fired exactly once per fully-received, CRC-validated activity file. */
-    var onFile: ((ParsedActivityFile) -> Unit)? = null
+    sealed class ChunkResult {
+        /** More chunks expected. */
+        data class Partial(val num: Int, val total: Int) : ChunkResult()
 
-    fun addChunk(chunk: ByteArray) {
-        if (chunk.size < 4) return
-        val header = ByteBuffer.wrap(chunk, 0, 4).order(ByteOrder.LITTLE_ENDIAN)
-        val total = header.short.toInt() and 0xFFFF
-        val current = header.short.toInt() and 0xFFFF
+        /** A complete file; [data] includes file id, padding, payload and CRC. */
+        class Complete(val fileId: XiaomiActivityFileId, val data: ByteArray) : ChunkResult()
 
-        if (current == 1) {
-            buffer = ByteArrayOutputStream()
-        }
-        buffer.write(chunk, 4, chunk.size - 4)
-
-        if (current != total) return
-
-        // File payload is now in buffer. Validate CRC-32, parse, emit.
-        val data = buffer.toByteArray()
-        buffer = ByteArrayOutputStream()
-        if (data.size < 13) return
-
-        val expectedCrc = ByteBuffer.wrap(data, data.size - 4, 4).order(ByteOrder.LITTLE_ENDIAN).int
-        val actualCrc = CRC32().run { update(data, 0, data.size - 4); value }.toInt()
-        if (expectedCrc != actualCrc) return
-
-        val fileId = XiaomiActivityFileId.from(data.copyOfRange(0, 7))
-        val parsed: ParsedActivityFile = when {
-            fileId.subtype == XiaomiActivityFileId.Subtype.ACTIVITY_DAILY ->
-                DailyDetailsParser.parse(fileId, data)
-                    ?.let { ParsedActivityFile.DailySamples(fileId, it) }
-                    ?: ParsedActivityFile.Unknown(fileId, data)
-            fileId.subtype == XiaomiActivityFileId.Subtype.ACTIVITY_SLEEP_STAGES ->
-                SleepStagesParser.parse(fileId, data)
-                    ?.let { ParsedActivityFile.Sleep(fileId, it) }
-                    ?: ParsedActivityFile.Unknown(fileId, data)
-            fileId.type == XiaomiActivityFileId.Type.SPORTS ->
-                WorkoutSummaryParser.parse(fileId, data)
-                    ?.let { ParsedActivityFile.Workout(fileId, it) }
-                    ?: ParsedActivityFile.Unknown(fileId, data)
-            else -> ParsedActivityFile.Unknown(fileId, data)
-        }
-        onFile?.invoke(parsed)
+        /** The last chunk arrived but the file is unusable. */
+        data class Invalid(val reason: String) : ChunkResult()
     }
+
+    private var buffer = ByteArrayOutputStream()
 
     fun reset() {
         buffer = ByteArrayOutputStream()
+    }
+
+    /** Feed one raw ACTIVITY-channel payload. Mirrors addChunk() upstream. */
+    fun assemble(chunk: ByteArray): ChunkResult {
+        if (chunk.size < 4) return ChunkResult.Invalid("chunk of ${chunk.size} bytes has no header")
+        val total = (chunk[0].toInt() and 0xFF) or ((chunk[1].toInt() and 0xFF) shl 8)
+        val num = (chunk[2].toInt() and 0xFF) or ((chunk[3].toInt() and 0xFF) shl 8)
+
+        if (num == 1) buffer = ByteArrayOutputStream()
+        buffer.write(chunk, 4, chunk.size - 4)
+
+        if (num != total) return ChunkResult.Partial(num, total)
+
+        val data = buffer.toByteArray()
+        buffer = ByteArrayOutputStream()
+
+        if (data.size < 13) return ChunkResult.Invalid("activity data length ${data.size} too short")
+
+        val expected = ByteBuffer.wrap(data, data.size - 4, 4).order(ByteOrder.LITTLE_ENDIAN).int
+        val actual = CRC32().run { update(data, 0, data.size - 4); value.toInt() }
+        if (expected != actual) {
+            return ChunkResult.Invalid(
+                "invalid checksum: got %08X, expected %08X".format(actual, expected),
+            )
+        }
+        if (data[7].toInt() != 0) {
+            Log.w(TAG, "Unexpected activity payload byte 0x%02X at position 7 - parsing might fail".format(data[7]))
+        }
+        val fileId = XiaomiActivityFileId.from(data.copyOfRange(0, 7))
+        return ChunkResult.Complete(fileId, data)
+    }
+
+    companion object {
+        private const val TAG = "MB9A_ActivityFetcher"
     }
 }

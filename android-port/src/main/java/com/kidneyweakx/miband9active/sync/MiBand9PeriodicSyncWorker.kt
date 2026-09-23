@@ -1,21 +1,34 @@
-/*  Copyright (C) 2026 kidneyweakx
- *  AGPL-3.0-or-later. See LICENSE, NOTICE.md.
+/*
+ * mi-band-9-active — a slim Mi Band 9 Active companion app
+ * Copyright (C) 2026 kidneyweakx
  *
- *  WorkManager job that runs every 30 minutes (when battery isn't low) and
- *  pulls the day's activity files from the band, parses them into the
- *  SampleStore, and writes them to Health Connect so Fitbit / Samsung
- *  Health / Google Fit see them too.
+ * Portions ported from Gadgetbridge (AGPL-3.0-or-later) — see NOTICE.md
  *
- *  Per `docs/POWER.md`:
- *    - 30 min minimum interval (Android's minimum for PeriodicWorkRequest)
- *    - `requiresBatteryNotLow = true`
- *    - no network constraint (we talk BLE, not WiFi)
- *    - the band may be out of range; we tolerate failures silently.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * Periodic background sync (docs/POWER.md "DailySummarySyncWorker"):
+ *   - PeriodicWorkRequest, interval >= 30 min, requiresBatteryNotLow.
+ *   - No network constraint (BLE only). No foreground service: the whole
+ *     job is bounded well inside WorkManager's 10-minute execution window
+ *     (connect <= 30 s, ActivitySync <= 180 s, HC export seconds).
+ *   - Band out of range / BT off / not paired → Result.success() (no retry
+ *     storm; the next periodic run tries again).
+ *
+ * Steps: DriverHolder.ensureConnected → ActivitySync.run → export yesterday
+ * + today to Health Connect when at least one WRITE permission is granted.
  */
 package com.kidneyweakx.miband9active.sync
 
-import android.bluetooth.BluetoothManager
 import android.content.Context
+import android.util.Log
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -23,20 +36,10 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.kidneyweakx.miband9active.DriverHolder
-import com.kidneyweakx.miband9active.SampleStore
 import com.kidneyweakx.miband9active.healthconnect.HealthConnectExporter
-import com.kidneyweakx.miband9active.xiaomi.activity.ParsedActivityFile
-import com.kidneyweakx.miband9active.xiaomi.activity.XiaomiActivityFileFetcher
-import com.kidneyweakx.miband9active.xiaomi.auth.XiaomiCrypto
-import com.kidneyweakx.miband9active.xiaomi.protocol.MiBand9BleDriver
-import com.kidneyweakx.miband9active.xiaomi.services.HealthCommands
+import java.time.LocalDate
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
-import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto
+import kotlin.coroutines.cancellation.CancellationException
 
 class MiBand9PeriodicSyncWorker(
     appContext: Context,
@@ -44,72 +47,51 @@ class MiBand9PeriodicSyncWorker(
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
-        val drv = DriverHolder.current ?: return Result.success()
+        Log.i(POWER_TAG, "periodic sync wake (attempt $runAttemptCount)")
 
-        // Mirror the syncSince logic from HybridBandLink but with a tighter
-        // 12 s grace window for background runs.
-        val fetcher = XiaomiActivityFileFetcher()
-        val collector: Job
-        run {
-            collector = collectorJob(drv, fetcher)
+        val driver = try {
+            DriverHolder.ensureConnected(CONNECT_TIMEOUT_MS)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            Log.i(TAG, "band not reachable, skipping this run: ${t.message}")
+            return Result.success()
         }
 
-        drv.sendCommand(
-            XiaomiProto.Command.newBuilder()
-                .setType(HealthCommands.COMMAND_TYPE)
-                .setSubtype(2)
-                .setHealth(
-                    XiaomiProto.Health.newBuilder().setActivitySyncRequestToday(
-                        XiaomiProto.ActivitySyncRequestToday.newBuilder().setUnknown1(0).build(),
-                    ),
-                )
-                .build(),
-        )
+        val files = try {
+            ActivitySync.run(driver) { phase, progress ->
+                Log.d(TAG, "sync $phase ${(progress * 100).toInt()}%")
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            Log.w(TAG, "activity sync failed", t)
+            0
+        }
+        Log.i(TAG, "background sync parsed $files activity files")
 
-        // Wait briefly. The collector parses any files it sees.
-        kotlinx.coroutines.delay(12_000)
-        collector.cancel()
-
-        // Export today's samples to Health Connect (Fitbit reads here).
-        val today = java.time.LocalDate.now().toString()
-        val samples = SampleStore.loadActivity(today)
-        val (summary, stages) = SampleStore.loadSleep(today)
-        runCatching {
-            HealthConnectExporter.exportDay(
-                context = applicationContext,
-                bandName = "Mi Band 9 Active",
-                bandSerial = today,
-                samples = samples,
-                sleepStages = stages,
-                sleepSummary = summary,
-            )
+        try {
+            val today = LocalDate.now()
+            val written = HealthConnectExporter.exportRange(applicationContext, today.minusDays(1), today)
+            if (written > 0) Log.i(TAG, "exported $written records to Health Connect")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            // HC missing, permission revoked (SecurityException), provider busy…
+            Log.w(TAG, "Health Connect export skipped", t)
         }
         return Result.success()
     }
 
-    private fun collectorJob(drv: MiBand9BleDriver, fetcher: XiaomiActivityFileFetcher): Job {
-        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
-        fetcher.onFile = { parsed ->
-            when (parsed) {
-                is ParsedActivityFile.DailySamples -> SampleStore.persistActivity(parsed.samples)
-                is ParsedActivityFile.Sleep -> {
-                    val dayIso = parsed.fileId.timestamp.toInstant().toString().substring(0, 10)
-                    SampleStore.persistSleep(dayIso, parsed.sleep.summary, parsed.sleep.stages)
-                }
-                is ParsedActivityFile.Workout -> SampleStore.persistWorkout(parsed.fileId, parsed.fields)
-                is ParsedActivityFile.Unknown -> Unit
-            }
-        }
-        return scope.launch {
-            drv.activityChunks.collect { chunk -> fetcher.addChunk(chunk) }
-        }
-    }
-
     companion object {
+        private const val TAG = "MB9A_PeriodicSync"
+        private const val POWER_TAG = "MB9A_POWER"
         private const val UNIQUE_NAME = "miband9active-periodic-sync"
+        private const val CONNECT_TIMEOUT_MS = 30_000L
+        private const val MIN_INTERVAL_MINUTES = 30L
 
-        fun enable(context: Context, intervalMinutes: Long = 30) {
-            val effective = intervalMinutes.coerceAtLeast(30)
+        fun enable(context: Context, intervalMinutes: Long = MIN_INTERVAL_MINUTES) {
+            val effective = intervalMinutes.coerceAtLeast(MIN_INTERVAL_MINUTES)
             val request = PeriodicWorkRequestBuilder<MiBand9PeriodicSyncWorker>(
                 effective, TimeUnit.MINUTES,
             ).setConstraints(

@@ -1,118 +1,218 @@
-/*  Copyright (C) 2026 kidneyweakx
- *  AGPL-3.0-or-later. See LICENSE, NOTICE.md.
+/*
+ * mi-band-9-active — a slim Mi Band 9 Active companion app
+ * Copyright (C) 2026 kidneyweakx
+ *
+ * Portions ported from Gadgetbridge (AGPL-3.0-or-later) — see NOTICE.md
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * Nitro facade over SampleStore. Every value returned comes from a sample
+ * the band sent; absent data is null / empty (CLAUDE.md rule 8).
  */
 package com.margelo.nitro.miband9active
 
+import android.util.Log
 import com.kidneyweakx.miband9active.SampleStore
-import com.kidneyweakx.miband9active.xiaomi.activity.NOT_MEASURED
 import com.kidneyweakx.miband9active.xiaomi.activity.SleepStageSample
+import com.kidneyweakx.miband9active.xiaomi.activity.SleepSummary
 import com.kidneyweakx.miband9active.xiaomi.activity.XiaomiActivityFileId
-import com.kidneyweakx.miband9active.xiaomi.activity.XiaomiActivitySample
+import com.margelo.nitro.core.NullType
 import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 
 class HybridHealthStore : HybridHybridHealthStoreSpec() {
 
+    override val lastSampleAt: Variant_NullType_String
+        get() {
+            val sec = safe(null) { SampleStore.lastSampleAtSec() }
+            return if (sec == null) {
+                Variant_NullType_String.create(NullType.NULL)
+            } else {
+                Variant_NullType_String.create(iso(sec))
+            }
+        }
+
     override fun getDailySummary(dateIso: String): Variant_NullType_HealthDailySummary {
-        val samples = SampleStore.loadActivity(dateIso)
-        val (sleepSummary, _) = SampleStore.loadSleep(dateIso)
-        if (samples.isEmpty() && sleepSummary == null) return Defaults.SUMMARY
-        return Variant_NullType_HealthDailySummary.create(buildSummary(dateIso, samples, sleepSummary))
+        val date = parseDate(dateIso) ?: return Defaults.SUMMARY
+        val summary = safe(null) { buildSummary(date) } ?: return Defaults.SUMMARY
+        return Variant_NullType_HealthDailySummary.create(summary)
     }
 
     override fun getDailySummariesRange(fromIso: String, toIso: String): Array<HealthDailySummary> {
-        val from = LocalDate.parse(fromIso, ISO_DATE)
-        val to = LocalDate.parse(toIso, ISO_DATE)
-        val out = mutableListOf<HealthDailySummary>()
-        var cursor = from
-        while (!cursor.isAfter(to)) {
-            val dayIso = cursor.format(ISO_DATE)
-            val samples = SampleStore.loadActivity(dayIso)
-            val (sleep, _) = SampleStore.loadSleep(dayIso)
-            if (samples.isNotEmpty() || sleep != null) {
-                out += buildSummary(dayIso, samples, sleep)
-            }
-            cursor = cursor.plusDays(1)
+        val from = parseDate(fromIso) ?: return emptyArray()
+        val to = parseDate(toIso) ?: return emptyArray()
+        if (to.isBefore(from) || from.plusDays(400).isBefore(to)) return emptyArray()
+        val out = ArrayList<HealthDailySummary>()
+        var d = from
+        while (!d.isAfter(to)) {
+            safe(null) { buildSummary(d) }?.let { out += it }
+            d = d.plusDays(1)
         }
         return out.toTypedArray()
     }
 
-    override fun getHeartRateSeries(dateIso: String): Array<HeartRateSample> =
-        SampleStore.loadActivity(dateIso)
-            .filter { it.heartRate != NOT_MEASURED && it.heartRate in 20..250 }
-            .map { HeartRateSample(takenAt = isoOf(it.timestampSec), bpm = it.heartRate.toDouble()) }
+    override fun getHeartRateSeries(dateIso: String): Array<HeartRateSample> {
+        val date = parseDate(dateIso) ?: return emptyArray()
+        val (from, to) = SampleStore.dayRange(date)
+        return safe(emptyList()) { SampleStore.heartRate(from, to) }
+            .map { HeartRateSample(takenAt = iso(it.timestampSec), bpm = it.bpm.toDouble()) }
             .toTypedArray()
+    }
 
-    override fun getStressSeries(dateIso: String): Array<StressSample> =
-        SampleStore.loadActivity(dateIso)
-            .filter { it.stress != NOT_MEASURED && it.stress in 0..100 }
+    override fun getStressSeries(dateIso: String): Array<StressSample> {
+        val date = parseDate(dateIso) ?: return emptyArray()
+        val (from, to) = SampleStore.dayRange(date)
+        return safe(emptyList()) { SampleStore.stress(from, to) }
             .map {
                 StressSample(
-                    takenAt = isoOf(it.timestampSec),
-                    score = it.stress.toDouble(),
+                    takenAt = iso(it.timestampSec),
+                    score = it.value.toDouble(),
+                    // XiaomiCoordinator.getStressRanges(): 1 / 26 / 51 / 81
                     bucket = when {
-                        it.stress <= 25 -> StressBucket.RELAXED
-                        it.stress <= 50 -> StressBucket.MILD
-                        it.stress <= 80 -> StressBucket.MODERATE
+                        it.value <= 25 -> StressBucket.RELAXED
+                        it.value <= 50 -> StressBucket.MILD
+                        it.value <= 80 -> StressBucket.MODERATE
                         else -> StressBucket.HIGH
                     },
                 )
             }
             .toTypedArray()
+    }
+
+    override fun getSpo2Series(dateIso: String): Array<Spo2Sample> {
+        val date = parseDate(dateIso) ?: return emptyArray()
+        val (from, to) = SampleStore.dayRange(date)
+        return safe(emptyList()) { SampleStore.spo2(from, to) }
+            .map { Spo2Sample(takenAt = iso(it.timestampSec), percent = it.value.toDouble(), manual = it.manual) }
+            .toTypedArray()
+    }
+
+    override fun getSleepSession(dateIso: String): Variant_NullType_SleepSessionSummary {
+        val date = parseDate(dateIso) ?: return Variant_NullType_SleepSessionSummary.create(NullType.NULL)
+        val s = safe(null) { mainSleep(date) }
+            ?: return Variant_NullType_SleepSessionSummary.create(NullType.NULL)
+        return Variant_NullType_SleepSessionSummary.create(
+            SleepSessionSummary(
+                bedAt = iso(s.bedTimeSec),
+                wakeAt = iso(s.wakeupTimeSec),
+                totalMinutes = nd(s.totalMinutes),
+                deepMinutes = nd(s.deepMinutes),
+                lightMinutes = nd(s.lightMinutes),
+                remMinutes = nd(s.remMinutes),
+                awakeMinutes = nd(s.awakeMinutes),
+            ),
+        )
+    }
 
     override fun getSleepSegments(dateIso: String): Array<SleepSegment> {
-        val (_, stages) = SampleStore.loadSleep(dateIso)
-        // Zip neighbouring samples to form [a→b] segments.
-        return stages.zipWithNext { a, b ->
-            SleepSegment(
-                startedAt = isoOf(a.timestampSec),
-                endedAt = isoOf(b.timestampSec),
-                stage = when (a.kind) {
-                    SleepStageSample.Kind.AWAKE -> SleepStage.AWAKE
-                    SleepStageSample.Kind.LIGHT -> SleepStage.LIGHT
-                    SleepStageSample.Kind.DEEP -> SleepStage.DEEP
-                    SleepStageSample.Kind.REM -> SleepStage.REM
-                    SleepStageSample.Kind.UNKNOWN -> SleepStage.AWAKE
-                },
-            )
-        }.toTypedArray()
+        val date = parseDate(dateIso) ?: return emptyArray()
+        val session = safe(null) { mainSleep(date) } ?: return emptyArray()
+        val stages = safe(emptyList()) { SampleStore.sleepStages(session.bedTimeSec, session.wakeupTimeSec) }
+        val out = ArrayList<SleepSegment>()
+        for ((i, st) in stages.withIndex()) {
+            val end = if (i + 1 < stages.size) stages[i + 1].timestampSec else session.wakeupTimeSec
+            if (end <= st.timestampSec) continue
+            val stage = when (st.kind) {
+                SleepStageSample.Kind.AWAKE -> SleepStage.AWAKE
+                SleepStageSample.Kind.LIGHT -> SleepStage.LIGHT
+                SleepStageSample.Kind.DEEP -> SleepStage.DEEP
+                SleepStageSample.Kind.REM -> SleepStage.REM
+                SleepStageSample.Kind.UNKNOWN -> null // not sleeping / n-a: no segment
+            } ?: continue
+            out += SleepSegment(startedAt = iso(st.timestampSec), endedAt = iso(end), stage = stage)
+        }
+        return out.toTypedArray()
     }
 
     override fun getRecentWorkouts(limit: Double): Array<WorkoutSummary> {
-        val n = limit.toInt().coerceAtLeast(1).coerceAtMost(500)
-        val rows = SampleStore.loadRecentWorkouts(n)
-        return rows.mapNotNull { o ->
-            val startSec = o.optLong("startSec", 0L)
-            if (startSec == 0L) return@mapNotNull null
-            val endSec = if (o.has("endSec")) o.optLong("endSec") else null
-            val durationSec = (o.optInt("activeSec", 0).takeIf { it > 0 }
-                ?: (endSec?.let { (it - startSec).toInt().coerceAtLeast(0) })
-                ?: 0).toDouble()
-            val subtypeCode = o.optInt("subtype", -1)
-            val kind = workoutKindFor(subtypeCode)
-            WorkoutSummary(
-                id = o.optString("id"),
-                kind = kind,
-                startedAt = Instant.ofEpochSecond(startSec).toString(),
-                endedAt = endSec?.let {
-                    Variant_NullType_String.create(Instant.ofEpochSecond(it).toString())
-                },
-                durationSeconds = durationSec,
-                kcal = if (o.has("kcal")) Variant_NullType_Double.create(o.optDouble("kcal")) else null,
-                distanceMeters = if (o.has("distM")) Variant_NullType_Double.create(o.optDouble("distM")) else null,
-                hrAvg = if (o.has("hrAvg")) Variant_NullType_Double.create(o.optDouble("hrAvg")) else null,
-                hrMax = if (o.has("hrMax")) Variant_NullType_Double.create(o.optDouble("hrMax")) else null,
-                hrMin = if (o.has("hrMin")) Variant_NullType_Double.create(o.optDouble("hrMin")) else null,
-                steps = if (o.has("steps")) Variant_NullType_Double.create(o.optDouble("steps")) else null,
-            )
-        }.toTypedArray()
+        val n = limit.toInt().coerceIn(1, 500)
+        return safe(emptyList()) { SampleStore.recentWorkouts(n * 2) }
+            .mapNotNull { w ->
+                val end = w.endSec?.takeIf { it > w.startSec }
+                val duration = w.activeSeconds?.takeIf { it > 0 }?.toLong() ?: end?.let { it - w.startSec }
+                // Undecoded layout (unknown sport/version): nothing real to show yet.
+                if (duration == null) return@mapNotNull null
+                WorkoutSummary(
+                    id = w.startSec.toString(),
+                    kind = workoutKind(w.workoutType, w.fileSubtype),
+                    startedAt = iso(w.startSec),
+                    endedAt = end?.let { Variant_NullType_String.create(iso(it)) },
+                    durationSeconds = duration.toDouble(),
+                    kcal = w.kcal?.let { Variant_NullType_Double.create(it.toDouble()) },
+                    distanceMeters = w.distanceMeters?.takeIf { it > 0 }?.let { Variant_NullType_Double.create(it.toDouble()) },
+                    hrAvg = w.hrAvg?.takeIf { it in SampleStore.HR_VALID }?.let { Variant_NullType_Double.create(it.toDouble()) },
+                    hrMax = w.hrMax?.takeIf { it in SampleStore.HR_VALID }?.let { Variant_NullType_Double.create(it.toDouble()) },
+                    hrMin = w.hrMin?.takeIf { it in SampleStore.HR_VALID }?.let { Variant_NullType_Double.create(it.toDouble()) },
+                    steps = w.steps?.let { Variant_NullType_Double.create(it.toDouble()) },
+                )
+            }
+            .take(n)
+            .toTypedArray()
     }
 
-    private fun workoutKindFor(subtypeCode: Int): WorkoutKind {
-        // Map XiaomiActivityFileId.Subtype.code → WorkoutKind. See
-        // XiaomiActivityFileId.kt for the canonical code table.
+    override fun clearAll() {
+        safe(Unit) { SampleStore.clearAll() }
+    }
+
+    // ----------------------------------------------------------------- internals
+
+    private fun buildSummary(date: LocalDate): HealthDailySummary? {
+        val agg = SampleStore.dayAggregate(date) ?: return null
+        // HealthDailySummary.steps is non-nullable: without step data the day
+        // has no summary (render "—"), never a 0 pretending to be data.
+        val steps = agg.steps ?: return null
+        return HealthDailySummary(
+            date = date.toString(),
+            steps = steps.toDouble(),
+            distanceMeters = agg.distanceMeters ?: 0.0,
+            activeCalories = agg.activeCalories ?: 0.0,
+            restingHeartRate = nd(agg.restingHeartRate),
+            averageHeartRate = ndD(agg.averageHeartRate),
+            sleepMinutes = nd(agg.sleepMinutes),
+            stressAverage = ndD(agg.stressAverage),
+            spo2Average = ndD(agg.spo2Average),
+            paiScore = Variant_NullType_Double.create(NullType.NULL),
+        )
+    }
+
+    /** Longest session that woke up on [date]. */
+    private fun mainSleep(date: LocalDate): SleepSummary? =
+        SampleStore.sleepSessionsEndingOn(date).maxByOrNull { it.wakeupTimeSec - it.bedTimeSec }
+
+    private fun workoutKind(xiaomiType: Int?, subtypeCode: Int): WorkoutKind {
+        if (xiaomiType != null) {
+            // XiaomiWorkoutType.fromCode() codes.
+            when (xiaomiType) {
+                1, 5 -> return WorkoutKind.RUNNING       // outdoor running, trail run
+                2, 15 -> return WorkoutKind.WALKING      // walking, outdoor walking
+                6 -> return WorkoutKind.OUTDOOR_CYCLING
+                7 -> return WorkoutKind.INDOOR_CYCLING
+                8 -> return WorkoutKind.FREESTYLE
+                9 -> return WorkoutKind.POOL_SWIMMING
+                11 -> return WorkoutKind.ELLIPTICAL
+                13 -> return WorkoutKind.ROWING
+                14 -> return WorkoutKind.JUMP_ROPE
+                16 -> return WorkoutKind.HIIT
+            }
+            // Known sport outside our kinds (yoga, hiking, …) — fall through to
+            // the file subtype only if it is more specific than "freestyle".
+            if (subtypeCode == XiaomiActivityFileId.Subtype.SPORTS_FREESTYLE.code ||
+                subtypeCode == XiaomiActivityFileId.Subtype.SPORTS_OUTDOOR_WALKING_V2.code ||
+                subtypeCode == XiaomiActivityFileId.Subtype.SPORTS_OUTDOOR_CYCLING.code
+            ) {
+                return WorkoutKind.OTHER
+            }
+        }
+        // WorkoutSummaryParser.updateSummaryFromData() activity kinds per subtype.
         return when (subtypeCode) {
             0x01 -> WorkoutKind.RUNNING          // SPORTS_OUTDOOR_RUNNING
             0x02 -> WorkoutKind.WALKING          // SPORTS_OUTDOOR_WALKING_V1
@@ -131,39 +231,28 @@ class HybridHealthStore : HybridHybridHealthStoreSpec() {
         }
     }
 
-    override fun clearAll() = SampleStore.clearAll()
+    private fun nd(v: Int?): Variant_NullType_Double =
+        if (v == null) Variant_NullType_Double.create(NullType.NULL) else Variant_NullType_Double.create(v.toDouble())
 
-    // ----------------------------------------------------------------- internals
+    private fun ndD(v: Double?): Variant_NullType_Double =
+        if (v == null) Variant_NullType_Double.create(NullType.NULL) else Variant_NullType_Double.create(v)
 
-    private fun buildSummary(
-        dateIso: String,
-        samples: List<XiaomiActivitySample>,
-        sleep: com.kidneyweakx.miband9active.xiaomi.activity.SleepSummary?,
-    ): HealthDailySummary {
-        val steps = samples.sumOf { if (it.steps == NOT_MEASURED) 0 else it.steps }
-        val distance = samples.sumOf { if (it.distanceCm == NOT_MEASURED) 0 else it.distanceCm } / 100.0
-        val kcal = samples.sumOf { if (it.activeCalories == NOT_MEASURED) 0 else it.activeCalories }.toDouble()
-        val hrValues = samples.mapNotNull { if (it.heartRate == NOT_MEASURED) null else it.heartRate }
-        val stressValues = samples.mapNotNull { if (it.stress == NOT_MEASURED) null else it.stress }
-        val spo2Values = samples.mapNotNull { if (it.spo2 == NOT_MEASURED) null else it.spo2 }
-        return HealthDailySummary(
-            date = dateIso,
-            steps = steps.toDouble(),
-            distanceMeters = distance,
-            activeCalories = kcal,
-            restingHeartRate = hrValues.minOrNull()?.toDouble()?.let { Variant_NullType_Double.create(it) },
-            averageHeartRate = if (hrValues.isEmpty()) null else Variant_NullType_Double.create(hrValues.average()),
-            sleepMinutes = sleep?.totalMinutes?.toDouble()?.let { Variant_NullType_Double.create(it) },
-            stressAverage = if (stressValues.isEmpty()) null else Variant_NullType_Double.create(stressValues.average()),
-            spo2Average = if (spo2Values.isEmpty()) null else Variant_NullType_Double.create(spo2Values.average()),
-            paiScore = null,
-        )
+    private fun iso(epochSec: Long): String = Instant.ofEpochSecond(epochSec).toString()
+
+    private fun parseDate(s: String): LocalDate? = try {
+        LocalDate.parse(s.take(10))
+    } catch (_: DateTimeParseException) {
+        null
     }
 
-    private fun isoOf(epochSec: Long): String =
-        Instant.ofEpochSecond(epochSec).toString()
+    private inline fun <T> safe(fallback: T, block: () -> T): T = try {
+        block()
+    } catch (t: Throwable) {
+        Log.e(TAG, "health store read failed", t)
+        fallback
+    }
 
     companion object {
-        private val ISO_DATE: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+        private const val TAG = "MB9A_HealthStore"
     }
 }

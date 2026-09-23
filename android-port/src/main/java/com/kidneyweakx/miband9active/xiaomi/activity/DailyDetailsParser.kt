@@ -1,13 +1,27 @@
-/*  Copyright (C) 2023-2024 José Rebelo                  (Gadgetbridge)
- *  Copyright (C) 2026 kidneyweakx                        (Kotlin port)
+/*  Copyright (C) 2023-2024 José Rebelo                                      (Gadgetbridge)
  *
- *  Translated from DailyDetailsParser.java. The original wrote samples into
- *  GreenDAO; our port returns the list and lets the caller persist.
+ * mi-band-9-active — a slim Mi Band 9 Active companion app
+ * Copyright (C) 2026 kidneyweakx
  *
- *  AGPL-3.0-or-later. See LICENSE, NOTICE.md.
+ * Portions ported from Gadgetbridge (AGPL-3.0-or-later) — see NOTICE.md
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * Translated from DailyDetailsParser.java (`ACTIVITY_DAILY / DETAILS`,
+ * versions 1-4). The original wrote samples into GreenDAO; this returns the
+ * list and SampleStore persists it (upsert by timestamp).
  */
 package com.kidneyweakx.miband9active.xiaomi.activity
 
+import android.util.Log
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -28,7 +42,10 @@ object DailyDetailsParser {
         val buf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).apply {
             limit(limit() - 4) // drop trailing CRC
             get(ByteArray(7)) // skip 7-byte fileId header
-            get() // skip padding byte
+        }
+        val padding = buf.get()
+        if (padding.toInt() != 0) {
+            Log.w("MB9A_DailyDetails", "Expected 0 padding after fileId, got $padding - parsing might fail")
         }
 
         val header = ByteArray(headerSize).also { buf.get(it) }
