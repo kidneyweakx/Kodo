@@ -112,11 +112,22 @@
     "pai": "活力 (PAI)"
   },
   "notifications": {
-    "title": "通知轉發",
+    "title": "通知",
     "permission": "需要通知存取權限",
-    "permissionBody": "授權後我們才能將通知轉到手環。",
-    "apps": "允許推送的 App",
-    "muteDnd": "手機勿擾時不轉發"
+    "permissionBody": "授權後,通知才能轉發到手環。",
+    "grant": "前往授權",
+    "apps": "轉發到手環的 App",
+    "appsBody": "只有開啟的 App 會被轉發。App 發出第一則通知後就會出現在這裡。",
+    "appsEmpty": "目前還沒有 App — 它們發出通知後會出現在這裡。",
+    "muteDnd": "勿擾模式時安靜",
+    "muteDndBody": "依照手機的勿擾規則",
+    "forwarding": "轉發",
+    "calls": "來電提醒",
+    "callsBody": "在手環顯示來電者,可從手腕拒接或靜音",
+    "callsPermission": "需要電話權限才能顯示來電者與掛斷",
+    "music": "音樂控制",
+    "musicIdle": "目前沒有播放",
+    "musicBody": "手環按鈕可控制手機正在播放的音樂"
   },
   "errors": {
     "btDenied": "已拒絕藍牙權限",

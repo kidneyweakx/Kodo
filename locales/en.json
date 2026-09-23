@@ -113,10 +113,21 @@
   },
   "notifications": {
     "title": "Notifications",
-    "permission": "Notification access required",
-    "permissionBody": "Grant access so we can forward alerts to the band.",
-    "apps": "Apps allowed to push",
-    "muteDnd": "Mute while phone is on Do Not Disturb"
+    "permission": "Notification access needed",
+    "permissionBody": "Grant access so notifications can reach your band.",
+    "grant": "Grant access",
+    "apps": "Apps that reach your band",
+    "appsBody": "Only apps you switch on are forwarded. An app appears here after it posts its first notification.",
+    "appsEmpty": "No apps yet — they'll show up here after they post a notification.",
+    "muteDnd": "Quiet during Do Not Disturb",
+    "muteDndBody": "Follow the phone's DND rules",
+    "forwarding": "Forwarding",
+    "calls": "Incoming call alerts",
+    "callsBody": "Show the caller on your band; reject or silence from the wrist",
+    "callsPermission": "Needs phone permissions to see the caller and end calls",
+    "music": "Music control",
+    "musicIdle": "Nothing playing",
+    "musicBody": "Band buttons control whatever is playing on the phone"
   },
   "errors": {
     "btDenied": "Bluetooth permission denied",

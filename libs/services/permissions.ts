@@ -101,6 +101,36 @@ export const permissions = {
     }
   },
 
+  /**
+   * Phone permissions behind band call alerts: READ_PHONE_STATE (caller
+   * number), ANSWER_PHONE_CALLS (reject from the band), READ_CONTACTS
+   * (caller name). Only the first is required; the rest degrade gracefully.
+   */
+  async requestCallAlerts(): Promise<boolean> {
+    if (!isAndroid) return true;
+    const wanted = (['READ_PHONE_STATE', 'ANSWER_PHONE_CALLS', 'READ_CONTACTS'] as const)
+      .map(resolvePermission)
+      .filter((p): p is Permission => p !== null);
+    try {
+      const result = await PermissionsAndroid.requestMultiple(wanted);
+      const phone = resolvePermission('READ_PHONE_STATE');
+      return phone ? result[phone] === PermissionsAndroid.RESULTS.GRANTED : true;
+    } catch {
+      return false;
+    }
+  },
+
+  async hasCallAlerts(): Promise<boolean> {
+    if (!isAndroid) return true;
+    const phone = resolvePermission('READ_PHONE_STATE');
+    if (!phone) return true;
+    try {
+      return await PermissionsAndroid.check(phone);
+    } catch {
+      return false;
+    }
+  },
+
   async hasPostNotifications(): Promise<boolean> {
     if (!isAndroid) return true;
     const id = resolvePermission('POST_NOTIFICATIONS');
