@@ -107,16 +107,11 @@ export function SyncStatusBar() {
   }));
 
   const onTap = async () => {
-    if (isSyncing) {
-      console.log('[SyncStatusBar] sync already in progress — ignoring tap');
-      return;
-    }
+    if (isSyncing) return;
     void hapticsBridge.fire('tap');
-    console.log('[SyncStatusBar] sync tapped');
     try {
       const since = new Date(Date.now() - 86_400_000).toISOString();
-      const count = await bandLink.syncSince(since);
-      console.log('[SyncStatusBar] sync OK, files=', count);
+      await bandLink.syncSince(since);
     } catch (e) {
       console.warn('[SyncStatusBar] sync failed:', e);
       const msg = e instanceof Error ? e.message : String(e);

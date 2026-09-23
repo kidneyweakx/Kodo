@@ -85,13 +85,13 @@ export function ThemedButton({
     haptic ?? (variant === 'destructive' ? 'warning' : variant === 'primary' ? 'tap' : 'selection');
 
   const onPressIn = useCallback(() => {
-    scale.value = withSpring(0.97, Motion.spring.press);
-    press.value = withTiming(1, { duration: Motion.duration.micro });
+    scale.set(withSpring(0.97, Motion.spring.press));
+    press.set(withTiming(1, { duration: Motion.duration.micro }));
   }, [scale, press]);
 
   const onPressOut = useCallback(() => {
-    scale.value = withSpring(1, Motion.spring.sheet);
-    press.value = withTiming(0, { duration: Motion.duration.fast });
+    scale.set(withSpring(1, Motion.spring.sheet));
+    press.set(withTiming(0, { duration: Motion.duration.fast }));
   }, [scale, press]);
 
   const handlePress = useCallback(
@@ -197,11 +197,11 @@ export function ThemedIconButton({
   const dim = heightFor(size);
 
   const onPressIn = useCallback(() => {
-    scale.value = withSpring(0.92, Motion.spring.press);
+    scale.set(withSpring(0.92, Motion.spring.press));
   }, [scale]);
 
   const onPressOut = useCallback(() => {
-    scale.value = withSpring(1, Motion.spring.sheet);
+    scale.set(withSpring(1, Motion.spring.sheet));
   }, [scale]);
 
   const handlePress = useCallback(
