@@ -56,3 +56,4 @@ GoogleService-Info.plist
 # --- test / coverage ---
 coverage/
 junit.xml
+*.jks

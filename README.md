@@ -73,13 +73,37 @@ bun lint                       # eslint
 
 A real Mi Band 9 Active and a real Android phone are required to exercise pairing, sync, and notifications. The Android emulator is fine for UI work but cannot scan BLE adverts.
 
+### Releasing an APK
+
+`.github/workflows/release.yml` builds a signed release APK (arm64-v8a + armeabi-v7a) and attaches it to a GitHub Release.
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+`scripts/set-version.js` stamps `version` and `versionCode` (`major*10000 + minor*100 + patch`) from the tag. You can also start the workflow by hand from the Actions tab.
+
+Signing uses these repository secrets. Without them the APK is signed with the debug key:
+
+| Secret | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | `base64 -i upload.jks` |
+| `ANDROID_KEYSTORE_PASSWORD` | store password |
+| `ANDROID_KEY_ALIAS` | key alias |
+| `ANDROID_KEY_PASSWORD` | key password (optional, defaults to the store password) |
+
+To create a keystore once: `keytool -genkeypair -v -keystore upload.jks -alias kodo -keyalg RSA -keysize 4096 -validity 10000`. Keep it out of git; `*.keystore` and `*.jks` are ignored.
+
+For a local release build, export `KODO_KEYSTORE_PATH`, `KODO_KEYSTORE_PASSWORD`, `KODO_KEY_ALIAS` and `KODO_KEY_PASSWORD`, then run `./gradlew :app:assembleRelease`.
+
 ---
 
 ## Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  React Native (Expo SDK 56 + Reanimated 4 + Expo Router)     │
+│  React Native (Expo SDK 57 + Reanimated 4 + Expo Router)     │
 │    components/themed/   →  ThemedButton / Text / Surface     │
 │    components/<feature> →  feature-scoped UI                 │
 │    libs/services/       →  JS facades (the only thing apps   │

@@ -1,6 +1,6 @@
 # mi-band-9-active — contributor playbook for Claude
 
-A slim Mi Band 9 Active companion app built on **Expo SDK 56 + RN 0.85 + Reanimated 4 + Nitro Modules**. AGPL-3.0-or-later because we port from [Gadgetbridge](https://codeberg.org/Freeyourgadget/Gadgetbridge).
+A slim Mi Band 9 Active companion app built on **Expo SDK 57 + RN 0.86 + Reanimated 4 + Nitro Modules**. AGPL-3.0-or-later because we port from [Gadgetbridge](https://codeberg.org/Freeyourgadget/Gadgetbridge).
 
 **Platform**: Android only. We do not build, ship, or test on iOS. `app.json` declares `"platforms": ["android"]` and Nitro specs only declare a `kotlin` target. Do not re-add Swift.
 
