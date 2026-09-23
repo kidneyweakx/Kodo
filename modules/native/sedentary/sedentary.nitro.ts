@@ -5,26 +5,38 @@
  * AGPL-3.0-or-later. See LICENSE, NOTICE.md.
  *
  * Ported from Gadgetbridge (AGPL-3.0):
- *   - XiaomiPreferences.FEAT_INACTIVITY
- *   - XiaomiSettingsCustomizer (inactivity preference exposure)
+ *   - XiaomiHealthService (CMD_CONFIG_STANDING_REMINDER_GET = 12 / _SET = 13,
+ *     proto `Health.standingReminder`)
+ *   - XiaomiCoordinator: `devicesettings_inactivity_dnd_no_threshold` — the band
+ *     exposes NO interval/threshold setting, only an active window plus an
+ *     optional "do not disturb" window.
  */
 
 import type { HybridObject } from 'react-native-nitro-modules';
 
+import type { TimeOfDay } from '../schedule/schedule.nitro';
+
 export interface SedentaryConfig {
   readonly enabled: boolean;
-  /** 24h, inclusive. e.g. 9 = 09:00 */
-  readonly startHour: number;
-  /** 24h, exclusive. e.g. 21 = until 20:59 */
-  readonly endHour: number;
-  /** Minutes of inactivity before the band buzzes. */
-  readonly intervalMinutes: number;
-  /** Don't disturb during lunch hour. */
-  readonly suppressDuringDnd: boolean;
+  /** Reminders are active between start and end (band local time). */
+  readonly start: TimeOfDay;
+  readonly end: TimeOfDay;
+  /** Suppress reminders inside the DND window (e.g. lunch). */
+  readonly dndEnabled: boolean;
+  readonly dndStart: TimeOfDay;
+  readonly dndEnd: TimeOfDay;
 }
 
-export interface HybridSedentary
-  extends HybridObject<{ android: 'kotlin' }> {
-  get(): SedentaryConfig;
+export interface HybridSedentary extends HybridObject<{ android: 'kotlin' }> {
+  /**
+   * Persisted config: the band-reported value after the last connect, or the
+   * user's pending change. `undefined` until either exists (never a guess).
+   */
+  get(): SedentaryConfig | undefined;
+  /** True when a local change has not reached the band yet. */
+  readonly pendingPush: boolean;
+  /** Re-read from the band. Resolves undefined when not connected / no reply. */
+  refresh(): Promise<SedentaryConfig | undefined>;
+  /** Persist + push (or queue for next connect). */
   set(config: SedentaryConfig): Promise<SedentaryConfig>;
 }

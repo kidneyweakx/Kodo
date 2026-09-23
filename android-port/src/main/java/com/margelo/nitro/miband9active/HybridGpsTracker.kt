@@ -1,78 +1,72 @@
 /*  Copyright (C) 2026 kidneyweakx
  *  AGPL-3.0-or-later. See LICENSE, NOTICE.md.
+ *
+ *  Phone GPS for workouts. Band pushes follow upstream XiaomiHealthService:
+ *  fixes are only sent (8/48, unknown1 = 2) while the BAND reports a started
+ *  workout, after answering its WORKOUT_WATCH_OPEN — see WorkoutGpsController.
+ *  The old version streamed every fix with unknown1 = 10 regardless of the
+ *  band's state and never answered the open request.
  */
 package com.margelo.nitro.miband9active
 
-import com.kidneyweakx.miband9active.AppContext
-import com.kidneyweakx.miband9active.DriverHolder
+import android.location.Location
 import com.kidneyweakx.miband9active.gps.MiBand9GpsService
-import com.kidneyweakx.miband9active.xiaomi.services.HealthCommands
+import com.kidneyweakx.miband9active.gps.WorkoutGpsController
+import com.kidneyweakx.miband9active.xiaomi.services.DeviceFeatures
 import com.margelo.nitro.core.Promise
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto
 
 class HybridGpsTracker : HybridHybridGpsTrackerSpec() {
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var _active = false
-    private var pushUnsub: (() -> Unit)? = null
 
-    override val isWorkoutActive: Boolean get() = _active
+    init {
+        DeviceFeatures.ensureStarted()
+    }
+
+    override val isWorkoutActive: Boolean get() = WorkoutGpsController.manualActive
+
     override val lastSample: Variant_NullType_GpsSample
         get() {
             val loc = MiBand9GpsService.latestLocation ?: return Defaults.GPS
             return Variant_NullType_GpsSample.create(loc.toSample())
         }
 
+    override val bandWorkoutState: BandWorkoutState get() = WorkoutGpsController.bandState.toNitro()
+
     override fun startWorkout(type: WorkoutType): Promise<Unit> = Promise.async {
-        MiBand9GpsService.start(AppContext.context)
-        _active = true
-        // Push every fix to the band on the Health channel.
-        pushUnsub?.invoke()
-        pushUnsub = MiBand9GpsService.onLocation { loc ->
-            val drv = DriverHolder.current ?: return@onLocation
-            scope.launch {
-                val wl = XiaomiProto.WorkoutLocation.newBuilder()
-                    .setUnknown1(10)
-                    .setTimestamp((loc.time / 1000L).toInt())
-                    .setLatitude(loc.latitude)
-                    .setLongitude(loc.longitude)
-                    .setAltitude(if (loc.hasAltitude()) loc.altitude else 0.0)
-                    .setSpeed(if (loc.hasSpeed()) loc.speed else 0f)
-                    .setBearing(if (loc.hasBearing()) loc.bearing else 0f)
-                    .setHorizontalAccuracy(if (loc.hasAccuracy()) loc.accuracy else 0f)
-                    .build()
-                drv.sendCommand(
-                    XiaomiProto.Command.newBuilder()
-                        .setType(HealthCommands.COMMAND_TYPE)
-                        .setSubtype(48)
-                        .setHealth(
-                            XiaomiProto.Health.newBuilder().setWorkoutLocation(wl),
-                        )
-                        .build(),
-                )
-            }
+        if (!WorkoutGpsController.startManual()) {
+            throw IllegalStateException("Could not start GPS (location permission, GPS off, or app not in foreground)")
         }
     }
 
     override fun stopWorkout(): Promise<Unit> = Promise.async {
-        pushUnsub?.invoke(); pushUnsub = null
-        MiBand9GpsService.stop(AppContext.context)
-        _active = false
+        WorkoutGpsController.stopManual()
     }
 
     override fun onSample(listener: (sample: GpsSample) -> Unit): () -> Unit =
         MiBand9GpsService.onLocation { loc -> listener(loc.toSample()) }
 
-    private fun android.location.Location.toSample(): GpsSample = GpsSample(
+    override fun getSendGpsToBand(): Boolean = WorkoutGpsController.sendGpsToBand
+
+    override fun setSendGpsToBand(enabled: Boolean) {
+        WorkoutGpsController.sendGpsToBand = enabled
+    }
+
+    override fun onBandWorkoutState(listener: (state: BandWorkoutState) -> Unit): () -> Unit =
+        WorkoutGpsController.addStateListener { listener(it.toNitro()) }
+
+    private fun String.toNitro(): BandWorkoutState = when (this) {
+        "gps_requested" -> BandWorkoutState.GPS_REQUESTED
+        "started" -> BandWorkoutState.STARTED
+        "paused" -> BandWorkoutState.PAUSED
+        else -> BandWorkoutState.NONE
+    }
+
+    private fun Location.toSample(): GpsSample = GpsSample(
         latitude = latitude,
         longitude = longitude,
-        altitudeMeters = if (hasAltitude()) Variant_NullType_Double.create(altitude) else null,
-        accuracyMeters = if (hasAccuracy()) Variant_NullType_Double.create(accuracy.toDouble()) else null,
-        speedMps = if (hasSpeed()) Variant_NullType_Double.create(speed.toDouble()) else null,
-        bearingDegrees = if (hasBearing()) Variant_NullType_Double.create(bearing.toDouble()) else null,
+        altitudeMeters = if (hasAltitude()) Variant_NullType_Double.create(altitude) else Variant_NullType_Double.create(Defaults.NULL),
+        accuracyMeters = if (hasAccuracy()) Variant_NullType_Double.create(accuracy.toDouble()) else Variant_NullType_Double.create(Defaults.NULL),
+        speedMps = if (hasSpeed()) Variant_NullType_Double.create(speed.toDouble()) else Variant_NullType_Double.create(Defaults.NULL),
+        bearingDegrees = if (hasBearing()) Variant_NullType_Double.create(bearing.toDouble()) else Variant_NullType_Double.create(Defaults.NULL),
         takenAt = time.toDouble(),
     )
 }

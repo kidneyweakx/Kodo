@@ -5,20 +5,24 @@
  * AGPL-3.0-or-later. See LICENSE, NOTICE.md.
  *
  * Ported from Gadgetbridge (AGPL-3.0):
- *   - GenericWeatherReceiver (ACTION_GENERIC_WEATHER intent format)
- *   - LineageOsWeatherReceiver, CMWeatherReceiver (alternative sources)
+ *   - externalevents.GenericWeatherReceiver (ACTION_GENERIC_WEATHER, extras
+ *     WeatherJson / WeatherSecondaryJson / WeatherGz, WeatherSpec JSON keys)
  *
- * The Kotlin side registers a BroadcastReceiver listening on
- * "com.kidneyweakx.miband9active.ACTION_GENERIC_WEATHER" and parses the same
- * payload shape Gadgetbridge ships (so existing weather apps can target us).
+ * The Kotlin receiver accepts both our own action
+ * "com.kidneyweakx.miband9active.ACTION_GENERIC_WEATHER" and Gadgetbridge's
+ * "nodomain.freeyourgadget.gadgetbridge.ACTION_GENERIC_WEATHER", so Breezy
+ * Weather & co. can target this app unchanged. Received weather is persisted
+ * and pushed to the band natively (no JS round-trip needed).
  *
- * For users without a weather app, we also expose a simple OWM polling
- * configuration that the Kotlin worker honors via WorkManager every 30 min.
+ * Built-in OpenWeatherMap poller: only runs when the user enabled it AND
+ * supplied an API key. WorkManager periodic, >= 6 h, network + battery-not-low
+ * (docs/POWER.md "WeatherPushWorker").
  */
 
 import type { HybridObject } from 'react-native-nitro-modules';
 
 import type { WeatherPushRequest } from '../types';
+import type { WeatherSnapshot } from '../weather/weather.nitro';
 
 export interface OwmConfig {
   readonly enabled: boolean;
@@ -26,19 +30,24 @@ export interface OwmConfig {
   readonly latitude: number;
   readonly longitude: number;
   readonly locationName: string;
-  /** Minimum 30 min, enforced. */
+  /** Minimum 360 (6 h), enforced natively. */
   readonly pollMinutes: number;
 }
 
-export interface HybridWeatherProvider
-  extends HybridObject<{ android: 'kotlin' }> {
-  /** Latest snapshot we hold (cached). */
+export interface HybridWeatherProvider extends HybridObject<{ android: 'kotlin' }> {
+  /**
+   * Compact view of the latest stored weather for dashboard cards
+   * (°C, Xiaomi condition codes 0..33). null when nothing was ever received.
+   */
   getLast(): WeatherPushRequest | null;
+  /** Full latest snapshot (OWM condition codes), undefined when none. */
+  getLastSnapshot(): WeatherSnapshot | undefined;
 
   setOwmConfig(config: OwmConfig): void;
   getOwmConfig(): OwmConfig;
+  /** One-shot OWM fetch + push. false if disabled / no key / network failure. */
+  refreshNow(): Promise<boolean>;
 
-  /** Fires when an external broadcast arrives. The JS side then calls
-   *  weatherBridge.push() to forward to the band. */
-  onExternalWeather(listener: (snapshot: WeatherPushRequest) => void): () => void;
+  /** Fires whenever a new snapshot is stored (broadcast, OWM or app push). */
+  onWeather(listener: (snapshot: WeatherSnapshot) => void): () => void;
 }

@@ -79,8 +79,9 @@ object XiaomiWeatherConditions {
         781, 900 -> WINDY
         // 800
         800 -> CLEAR_SKY
-        // 80x
-        801, 802, 803, 804 -> OVERCAST
+        // 80x — upstream 49eedbe3e7 "Fix cloudy weather icon": few/scattered/broken -> CLOUDY
+        801, 802, 803 -> CLOUDY
+        804 -> OVERCAST
         // 9xx extreme
         901 -> WINDY
         903, 904 -> CLEAR_SKY

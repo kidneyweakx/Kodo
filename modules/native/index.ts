@@ -20,6 +20,7 @@ import type { HybridHealthConnect } from '@/modules/native/healthConnect/healthC
 import type { HybridHealthStore } from '@/modules/native/health/health.nitro';
 import type { HybridMusicBridge } from '@/modules/native/music/music.nitro';
 import type { HybridNotificationBridge } from '@/modules/native/notifications/notifications.nitro';
+import type { HybridSchedule } from '@/modules/native/schedule/schedule.nitro';
 import type { HybridSedentary } from '@/modules/native/sedentary/sedentary.nitro';
 import type { HybridSystemControl } from '@/modules/native/system/system.nitro';
 import type { HybridWatchface } from '@/modules/native/watchface/watchface.nitro';
@@ -50,6 +51,7 @@ export const NativeSedentary = lazyHybrid<HybridSedentary>('HybridSedentary');
 export const NativeWeatherProvider = lazyHybrid<HybridWeatherProvider>('HybridWeatherProvider');
 export const NativeHealthConnect = lazyHybrid<HybridHealthConnect>('HybridHealthConnect');
 export const NativeWatchface = lazyHybrid<HybridWatchface>('HybridWatchface');
+export const NativeSchedule = lazyHybrid<HybridSchedule>('HybridSchedule');
 
 export type {
   HybridBandLink,
@@ -60,16 +62,50 @@ export type {
   HybridHealthStore,
   HybridMusicBridge,
   HybridNotificationBridge,
+  HybridSchedule,
   HybridSedentary,
   HybridSystemControl,
   HybridWatchface,
   HybridWeatherBridge,
   HybridWeatherProvider,
 };
-export type { WatchfaceInfo } from '@/modules/native/watchface/watchface.nitro';
+export type { WatchfaceFileInfo, WatchfaceInfo } from '@/modules/native/watchface/watchface.nitro';
 
 export * from '@/modules/native/types';
-export type { GpsSample, WorkoutType } from '@/modules/native/gps/gps.nitro';
+export type { BandWorkoutState, GpsSample, WorkoutType } from '@/modules/native/gps/gps.nitro';
+export type {
+  AlarmDraft,
+  AlarmList,
+  BandAlarm,
+  BandReminder,
+  ReminderDraft,
+  ReminderList,
+  ReminderRepeat,
+  SleepModeConfig,
+  TimeOfDay,
+} from '@/modules/native/schedule/schedule.nitro';
+export type {
+  BandDeviceInfo,
+  BandFeatures,
+  BandSystemSettings,
+  HealthMonitoringSettings,
+  HeartRateInterval,
+  SecondaryGoal,
+  UserGender,
+  UserProfile,
+  VibrationAssignment,
+  VibrationCategory,
+  VibrationCustomPattern,
+  VibrationPatternsInfo,
+} from '@/modules/native/system/system.nitro';
+export type {
+  TemperatureUnit,
+  WeatherDaily,
+  WeatherHourly,
+  WeatherSnapshot,
+  WeatherSource,
+} from '@/modules/native/weather/weather.nitro';
+export type { CalendarSyncSettings } from '@/modules/native/calendar/calendar.nitro';
 export type { SedentaryConfig } from '@/modules/native/sedentary/sedentary.nitro';
 export type { OwmConfig } from '@/modules/native/weatherProvider/weatherProvider.nitro';
 export type { HealthConnectKind, HealthConnectStatus } from '@/modules/native/healthConnect/healthConnect.nitro';

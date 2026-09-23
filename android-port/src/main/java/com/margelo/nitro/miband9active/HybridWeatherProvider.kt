@@ -1,72 +1,82 @@
 /*  Copyright (C) 2026 kidneyweakx
  *  AGPL-3.0-or-later. See LICENSE, NOTICE.md.
+ *
+ *  Weather sources: GenericWeatherReceiver broadcasts (stored + pushed
+ *  natively) and the optional OpenWeatherMap poller (OwmWeather, >= 6 h
+ *  WorkManager, network + battery-not-low, only with a user API key).
+ *  Nothing here invents weather: without a source, getLast() is null.
  */
 package com.margelo.nitro.miband9active
 
-import com.kidneyweakx.miband9active.AppContext
-import com.kidneyweakx.miband9active.xiaomi.services.GenericWeatherReceiver
-import com.kidneyweakx.miband9active.xiaomi.services.WeatherSnapshot
 import com.kidneyweakx.miband9active.xiaomi.XiaomiWeatherConditions
-import android.content.SharedPreferences
+import com.kidneyweakx.miband9active.xiaomi.services.DeviceFeatures
+import com.kidneyweakx.miband9active.xiaomi.services.OwmWeather
+import com.kidneyweakx.miband9active.xiaomi.services.WeatherService
+import com.margelo.nitro.core.Promise
+import java.time.Instant
+import java.time.ZoneId
 
 class HybridWeatherProvider : HybridHybridWeatherProviderSpec() {
 
-    override fun getLast(): Variant_NullType_WeatherPushRequest {
-        val last = lastSnapshot ?: return Defaults.WEATHER
-        return Variant_NullType_WeatherPushRequest.create(last)
+    init {
+        DeviceFeatures.ensureStarted()
     }
+
+    override fun getLast(): Variant_NullType_WeatherPushRequest {
+        val w = WeatherService.latest() ?: return Defaults.WEATHER
+        val zone = ZoneId.systemDefault()
+        val request = WeatherPushRequest(
+            locationName = w.location,
+            latitude = w.latitude?.toDouble() ?: 0.0,
+            longitude = w.longitude?.toDouble() ?: 0.0,
+            current = WeatherCurrent(
+                tempC = (w.currentTempK - 273).toDouble(),
+                conditionCode = XiaomiWeatherConditions.convertOwmConditionToXiaomi(w.conditionCode).toDouble(),
+                humidity = w.humidity.toDouble(),
+                // WeatherCurrent.aqi is non-nullable in types.ts: -1 = unknown (render "—"), never a fake 0.
+                aqi = if (w.aqi >= 0) w.aqi.toDouble() else -1.0,
+            ),
+            daily = w.forecasts.mapIndexed { i, d ->
+                WeatherDailyForecast(
+                    date = Instant.ofEpochSecond(w.timestamp.toLong()).atZone(zone).toLocalDate().plusDays((i + 1).toLong()).toString(),
+                    highC = (d.maxTempK - 273).toDouble(),
+                    lowC = (d.minTempK - 273).toDouble(),
+                    conditionCode = XiaomiWeatherConditions.convertOwmConditionToXiaomi(d.conditionCode).toDouble(),
+                )
+            }.toTypedArray(),
+        )
+        return Variant_NullType_WeatherPushRequest.create(request)
+    }
+
+    override fun getLastSnapshot(): WeatherSnapshot? = WeatherService.latest()?.toSnapshot()
 
     override fun setOwmConfig(config: OwmConfig) {
-        val prefs = AppContext.context.getSharedPreferences(OWM_PREFS, android.content.Context.MODE_PRIVATE)
-        val effective = config.copy(pollMinutes = config.pollMinutes.coerceAtLeast(30.0))
-        prefs.edit()
-            .putBoolean("enabled", effective.enabled)
-            .putString("apiKey", effective.apiKey)
-            .putFloat("lat", effective.latitude.toFloat())
-            .putFloat("lon", effective.longitude.toFloat())
-            .putString("name", effective.locationName)
-            .putFloat("pollMinutes", effective.pollMinutes.toFloat())
-            .apply()
-    }
-
-    override fun getOwmConfig(): OwmConfig {
-        val prefs = AppContext.context.getSharedPreferences(OWM_PREFS, android.content.Context.MODE_PRIVATE)
-        return OwmConfig(
-            enabled = prefs.getBoolean("enabled", false),
-            apiKey = prefs.getString("apiKey", "") ?: "",
-            latitude = prefs.getFloat("lat", 0f).toDouble(),
-            longitude = prefs.getFloat("lon", 0f).toDouble(),
-            locationName = prefs.getString("name", "") ?: "",
-            pollMinutes = prefs.getFloat("pollMinutes", 30f).toDouble().coerceAtLeast(30.0),
+        OwmWeather.setConfig(
+            OwmWeather.Config(
+                enabled = config.enabled,
+                apiKey = config.apiKey,
+                latitude = config.latitude,
+                longitude = config.longitude,
+                locationName = config.locationName,
+                pollMinutes = config.pollMinutes.toInt(),
+            ),
         )
     }
 
-    override fun onExternalWeather(listener: (snapshot: WeatherPushRequest) -> Unit): () -> Unit {
-        val forwarder: (List<WeatherSnapshot>) -> Unit = { list ->
-            list.firstOrNull()?.let {
-                lastSnapshot = it.toRequest()
-                listener(it.toRequest())
-            }
-        }
-        GenericWeatherReceiver.forwarder = forwarder
-        return { GenericWeatherReceiver.forwarder = null }
+    override fun getOwmConfig(): OwmConfig {
+        val c = OwmWeather.getConfig()
+        return OwmConfig(
+            enabled = c.enabled,
+            apiKey = c.apiKey,
+            latitude = c.latitude,
+            longitude = c.longitude,
+            locationName = c.locationName,
+            pollMinutes = c.pollMinutes.toDouble(),
+        )
     }
 
-    private fun WeatherSnapshot.toRequest(): WeatherPushRequest = WeatherPushRequest(
-        locationName = location,
-        latitude = 0.0,
-        longitude = 0.0,
-        current = WeatherCurrent(
-            tempC = currentTempC.toDouble(),
-            conditionCode = XiaomiWeatherConditions.convertOwmConditionToXiaomi(currentConditionCode).toDouble(),
-            humidity = humidityPct.toDouble(),
-            aqi = 0.0,
-        ),
-        daily = emptyArray(),
-    )
+    override fun refreshNow(): Promise<Boolean> = Promise.async { OwmWeather.refresh() }
 
-    companion object {
-        private const val OWM_PREFS = "miband9active_weather"
-        @Volatile private var lastSnapshot: WeatherPushRequest? = null
-    }
+    override fun onWeather(listener: (snapshot: WeatherSnapshot) -> Unit): () -> Unit =
+        WeatherService.addListener { listener(it.toSnapshot()) }
 }
