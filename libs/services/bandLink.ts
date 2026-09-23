@@ -16,6 +16,7 @@
 import { useEffect, useState } from 'react';
 
 import { cache, cacheKeys } from '@/libs/services/cache';
+import { localDateIso } from '@/libs/services/healthStore';
 import { syncStatus } from '@/libs/services/syncStatus';
 import { NativeBandLink, NativeHealthConnect } from '@/modules/native';
 import { safeCall, safeUnsubscribe, safeAsync } from '@/modules/native/safe';
@@ -138,7 +139,6 @@ export const bandLink = {
         } catch (e) {
           const cached = bandLink.getPairedSync();
           if (pairErrorCode(e) !== 'NOT_PAIRED' || !cached) throw e;
-          console.log('[bandLink] migrating MMKV-only band to native store', cached.id);
           await bandLink.pair(cached.id, cached.authKey, cached.name);
         }
       } finally {
@@ -174,10 +174,10 @@ export const bandLink = {
         const count = await NativeBandLink().syncSince(sinceIso);
         // Best-effort Health Connect export of today; band sync already succeeded.
         try {
-          const today = new Date().toISOString().slice(0, 10);
-          await NativeHealthConnect().exportDay(today);
-        } catch (e) {
-          console.log('[bandLink] HealthConnect export skipped:', (e as Error)?.message ?? e);
+          // Local calendar day — a UTC date exports the wrong day east of GMT.
+          await NativeHealthConnect().exportDay(localDateIso());
+        } catch {
+          // No HC permission / HC missing: the band sync itself still succeeded.
         }
         const finishedAt = new Date().toISOString();
         cache.set(cacheKeys.lastSyncAt, finishedAt);
