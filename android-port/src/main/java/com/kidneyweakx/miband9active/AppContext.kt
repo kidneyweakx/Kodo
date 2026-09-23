@@ -27,6 +27,10 @@ object AppContext {
 class InitializerProvider : ContentProvider() {
     override fun onCreate(): Boolean {
         context?.let { AppContext.install(it) }
+        // Band-initiated features (find phone, GPS workout, weather request,
+        // camera) must be handled even before JS creates any HybridObject.
+        // Cheap: two Flow collectors on the (lazily created) driver singleton.
+        com.kidneyweakx.miband9active.xiaomi.services.DeviceFeatures.ensureStarted()
         return true
     }
     override fun query(uri: Uri, projection: Array<out String>?, selection: String?, selectionArgs: Array<out String>?, sortOrder: String?): Cursor? = null

@@ -55,7 +55,6 @@ import android.util.Log
 import com.google.protobuf.ByteString
 import com.kidneyweakx.miband9active.xiaomi.auth.XiaomiAuthSession
 import com.kidneyweakx.miband9active.xiaomi.services.SystemCommands
-import java.util.Calendar
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
@@ -819,57 +818,19 @@ class MiBand9BleDriver(context: Context) {
 
     /**
      * Phase 2, trimmed to what this band needs: XiaomiSupport.onAuthSuccess
-     * (L404-416) → systemService.setCurrentTime() + XiaomiSystemService.initialize()
-     * (device info, device state, battery). User info / health configs need
-     * real user profile data we don't collect yet, so they're skipped rather
-     * than faked.
+     * (L404-416) → XiaomiSystemService.initialize() (device info, device
+     * state, battery). Clock, health prefs, schedule, weather and calendar are
+     * pushed by DeviceFeatures on the same Connected transition, in upstream
+     * order and with the user's 12/24h preference.
      */
     private suspend fun runPostAuthInit() {
         try {
-            sendCommand(buildSetTimeCommand())
             sendCommand(SystemCommands.COMMAND_TYPE, SystemCommands.CMD_DEVICE_INFO)
             sendCommand(SystemCommands.COMMAND_TYPE, SystemCommands.CMD_DEVICE_STATE_GET)
             sendCommand(SystemCommands.COMMAND_TYPE, SystemCommands.CMD_BATTERY)
         } catch (t: Throwable) {
             Log.w(TAG, "post-auth init failed", t)
         }
-    }
-
-    /** XiaomiSystemService.setCurrentTime. */
-    fun buildSetTimeCommand(): XiaomiProto.Command {
-        val now = Calendar.getInstance()
-        val tz = java.util.TimeZone.getDefault()
-        val is24h = android.text.format.DateFormat.is24HourFormat(appContext)
-        val clock = XiaomiProto.Clock.newBuilder()
-            .setTime(
-                XiaomiProto.Time.newBuilder()
-                    .setHour(now.get(Calendar.HOUR_OF_DAY))
-                    .setMinute(now.get(Calendar.MINUTE))
-                    .setSecond(now.get(Calendar.SECOND))
-                    .setMillisecond(now.get(Calendar.MILLISECOND))
-                    .build(),
-            )
-            .setDate(
-                XiaomiProto.Date.newBuilder()
-                    .setYear(now.get(Calendar.YEAR))
-                    .setMonth(now.get(Calendar.MONTH) + 1)
-                    .setDay(now.get(Calendar.DATE))
-                    .build(),
-            )
-            .setTimezone(
-                XiaomiProto.TimeZone.newBuilder()
-                    .setZoneOffset(now.get(Calendar.ZONE_OFFSET) / 1000 / 60 / 15)
-                    .setDstOffset(now.get(Calendar.DST_OFFSET) / 1000 / 60 / 15)
-                    .setName(tz.id)
-                    .build(),
-            )
-            .setIsNot24Hour(!is24h)
-            .build()
-        return XiaomiProto.Command.newBuilder()
-            .setType(SystemCommands.COMMAND_TYPE)
-            .setSubtype(SystemCommands.CMD_CLOCK)
-            .setSystem(XiaomiProto.System.newBuilder().setClock(clock).build())
-            .build()
     }
 
     private fun regionCode(): String {

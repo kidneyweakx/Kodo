@@ -33,7 +33,6 @@ import android.util.Log
 import com.kidneyweakx.miband9active.AppContext
 import com.kidneyweakx.miband9active.BandStore
 import com.kidneyweakx.miband9active.DriverHolder
-import com.kidneyweakx.miband9active.PhoneRinger
 import com.kidneyweakx.miband9active.sync.ActivitySync
 import com.kidneyweakx.miband9active.sync.MiBand9PeriodicSyncWorker
 import com.kidneyweakx.miband9active.xiaomi.auth.XiaomiCrypto
@@ -87,16 +86,6 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
             driver.battery.collect { reading ->
                 val info = reading?.toBatteryInfo() ?: return@collect
                 batteryListeners.forEach { safeInvoke { it(info) } }
-            }
-        }
-        scope.launch {
-            // XiaomiSystemService.handleCommand CMD_FIND_PHONE.
-            driver.incoming.collect { msg ->
-                if (msg.type != SystemCommands.COMMAND_TYPE || msg.subtype != SystemCommands.CMD_FIND_PHONE) return@collect
-                if (!msg.command.hasSystem()) return@collect
-                val op = msg.command.system.findDevice
-                Log.i(TAG, "find phone op=$op (0=start)")
-                if (op == 0) PhoneRinger.start() else PhoneRinger.stop()
             }
         }
     }
