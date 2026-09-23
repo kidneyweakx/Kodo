@@ -45,6 +45,12 @@ module.exports = [
     },
   },
   {
+    files: ['scripts/**/*.js', 'plugins/**/*.js'],
+    languageOptions: {
+      globals: { __dirname: 'readonly', require: 'readonly', module: 'writable', process: 'readonly', console: 'readonly' },
+    },
+  },
+  {
     files: ['**/*.config.{js,cjs,mjs}', '**/__tests__/**'],
     rules: {
       'no-restricted-syntax': 'off',
