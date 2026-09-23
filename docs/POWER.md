@@ -1,60 +1,73 @@
 # Power-saving strategy (Android-only)
 
-This project only ships to Android. Every battery decision below is enforced both in the JS facades (`libs/services/*`) and in the Kotlin Nitro implementations under `android/src/main/java/.../mibandactive/` (to be authored).
+This project only ships to Android. Every battery decision below is enforced in the Kotlin engine under `android-port/src/main/java/com/kidneyweakx/miband9active/` and the JS facades in `libs/services/*`.
 
 ---
 
 ## Non-negotiables
 
-1. **No always-on foreground service.** A foreground service is started **only** during an active sync window (≤ 60s typical) and **stopped immediately** when the sync resolves. Connecting → syncing → disconnect is one atomic job.
-2. **No `WAKE_LOCK`.** WorkManager wakes the device for us. We never pin the CPU on ourselves.
-3. **No background location permission.** Android's BLE-scan needs `ACCESS_FINE_LOCATION` *only while in foreground*. We do not request `ACCESS_BACKGROUND_LOCATION`.
-4. **Periodic sync interval ≥ 30 min** (`PeriodicWorkRequest`, minimum 15 min by Android rules, we use 30). User can extend this but cannot shorten below 30 min.
-5. **Realtime HR streaming OFF by default.** It is the single biggest power sink on the band and on the phone radio. Users must explicitly opt in per-session.
+1. **Persistent link, passive only.** While a band is paired we keep one GATT connection open so notifications, calls, music, find-phone and band-initiated GPS reach the phone the moment they happen. This is what Gadgetbridge does. It costs almost nothing because:
+   - It is a normal GATT client with **no foreground service**, **no scanning** and **no wake lock**.
+   - After an unexpected drop we re-arm `connectGatt(autoConnect = true)`, so the Bluetooth controller reconnects when the band comes back in range. The app does no polling.
+   - Re-arm delays are 1 s after a clean drop and 5 s after a stack error, backing off to 10 min after repeated failures.
+   - Reconnect stops entirely on a wrong key, a user disconnect or unpair, or when Bluetooth is turned off, and resumes when it is turned back on.
+   - Everything is tagged `MB9A_POWER` in logcat.
+2. **Foreground services only while the user is doing something.** The only one is `MiBand9GpsService` (`FOREGROUND_SERVICE_TYPE_LOCATION`). It runs only while a phone-GPS workout is active and stops on workout end, or 2 min after the band disconnects. Sync never uses a foreground service.
+3. **We never acquire a `WAKE_LOCK`.** WorkManager's merged manifest declares the permission for its own scheduler; none of our code holds one.
+4. **No background location permission.** BLE scanning needs `ACCESS_FINE_LOCATION` only in the foreground (onboarding / re-pair), and GPS workouts run inside the foreground service above. We never request `ACCESS_BACKGROUND_LOCATION`.
+5. **Periodic sync interval ≥ 30 min** (`PeriodicWorkRequest`; Android's minimum is 15, we clamp to 30 natively). The user can lengthen it but not shorten it.
+6. **Realtime HR streaming off by default.** It is the single biggest power sink on the band and the phone radio.
 
 ## BLE scan policy
 
-| Phase | Duration | Duty cycle | Window |
+| Phase | Duration | Mode | Trigger |
 |---|---|---|---|
-| Onboarding scan (foreground) | 12 s max | continuous | one-shot |
-| Auto-reconnect (background, screen off) | 1.2 s active / 12 s idle | ≤ 10% | only during scheduled work window |
-| Manual re-pair | 12 s max | continuous | user-triggered |
+| Onboarding scan (foreground) | 12 s max, ends early on `stopScan()` | `SCAN_MODE_LOW_LATENCY` | user on the "Find your band" step |
+| Re-pair from Settings | 12 s max | `SCAN_MODE_LOW_LATENCY` | user-triggered |
+| Reconnect | — | **no scan**: passive `autoConnect` | automatic |
 
-We never start a background `BluetoothLeScanner` that runs > 15 s. The Kotlin implementation must call `stopScan()` on a Handler-posted timeout, not on the assumption the OS will preempt.
+We never run a background `BluetoothLeScanner`. Scans stop on a Handler-posted timeout, never on the assumption that the OS will preempt them.
 
 ## WorkManager schedule
 
 | Job | Cadence | Constraints |
 |---|---|---|
-| `DailySummarySyncWorker` | every 30 min (periodic) | `requiresBatteryNotLow=true`, no network constraint |
-| `NotificationFlushWorker` | one-time, expedited, on NLS event | `setExpedited()` only when band is already connected; otherwise enqueue normal |
-| `WeatherPushWorker` | every 6h | `requiresBatteryNotLow=true`, network connected |
-| `CalendarPushWorker` | every 6h | `requiresBatteryNotLow=true` |
+| `MiBand9PeriodicSyncWorker` | every 30 min (user: 30 min–4 h) | `requiresBatteryNotLow`. Uses the existing link (connects only if needed) → `ActivitySync` → Health Connect export of yesterday and today |
+| `OwmWeatherWorker` | every ≥ 6 h, **only if** the user entered an OpenWeatherMap key | network connected, `requiresBatteryNotLow` |
+| `CalendarPushWorker` | every 6 h, only when calendar sync is on | `requiresBatteryNotLow`; pushes only if already connected |
 
-`requiresBatteryNotLow=true` means: when the phone is under 15% battery, we skip the run. The user can still pull-to-refresh manually on the dashboard.
+With `requiresBatteryNotLow` the job is skipped when the phone is below ~15 %. The user can still sync manually from the dashboard or Settings.
+
+Weather received from other apps (the Gadgetbridge `ACTION_GENERIC_WEATHER` broadcast), calendar, health preferences, alarms and the clock are also pushed when the band connects. These ride on the existing link, so no extra wake-up is needed.
 
 ## Doze / App Standby
 
-We **assume Doze**. We do not ask for "Ignore battery optimization" in the onboarding flow (it's a soft prompt only, skip is OK). The work pattern is designed to fire during maintenance windows that Doze itself grants.
+We **assume Doze**. Exempting the app from battery optimisation is optional: it appears in the onboarding checklist and in Settings › Sync & data, with its real status, and can be skipped. Periodic work runs in the maintenance windows Doze grants.
 
-If the OEM is aggressive (MIUI, ColorOS, EMUI), we let the user know via an in-app banner: "你的廠商可能會在背景殺掉同步,設定 → 電池 → 不限制本 App / Your OEM may kill background sync — exempt this app in system settings."
+On aggressive OEM ROMs (MIUI, ColorOS, EMUI) the Sync & data page shows whether the app is still restricted and links straight to the exemption screen.
 
 ## Notification forwarding
 
 `NotificationListenerService` callbacks are short. We:
 
-- Drop notifications that are not in the user's allow-list **before** waking the BLE stack.
-- Coalesce a 250ms window of incoming notifications into a single BLE write.
-- Downscale notification icons to **24×24 PNG** before send (Gadgetbridge sends 40×40+; we save flash + RF time).
+- Forward **only allow-listed apps**. The list is strict: nothing is forwarded until the user switches an app on. Everything else is dropped **before** the BLE stack is touched.
+- Drop ongoing, group-summary, local-only, media, low-importance and own-app notifications, plus repeats of the same content.
+- Drop notifications while the band is disconnected. The listener never starts a connection.
+- Coalesce a 250 ms window of incoming notifications into one BLE write.
+- Send icons at the exact size and format the band asks for (upstream `XiaomiBitmapUtils`). Each app's icon is uploaded once, only when the band says it doesn't have it cached.
 
 ## What we do NOT do (and won't add)
 
-- ❌ Persistent foreground service "for reliability".
+- ❌ Persistent foreground service "for reliability". The passive link above needs none.
 - ❌ `JobIntentService`, `AlarmManager.setExactAndAllowWhileIdle()` polling loops.
-- ❌ Background BLE scan with `SCAN_MODE_LOW_LATENCY`.
+- ❌ Background BLE scans of any mode.
 - ❌ Continuous heart-rate streaming as the default.
 - ❌ Asking for `ACCESS_BACKGROUND_LOCATION`.
 
 ## Auditing
 
-There's a Logcat tag prefix `MB9A_POWER` on every wake-up. Run `adb shell dumpsys batterystats` after a 24h soak to verify the per-app wake count stays under 50.
+Every wake-up and link transition logs under the `MB9A_POWER` tag. After a 24 h soak, run `adb shell dumpsys batterystats --charged com.kidneyweakx.kodo` and check that:
+
+- Wake-ups stay under 50 per day.
+- There are no wakelocks attributed to the app outside WorkManager.
+- Bluetooth scan time is only from onboarding.
