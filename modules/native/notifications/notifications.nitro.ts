@@ -6,7 +6,12 @@
  *
  * Ported semantically from Gadgetbridge (AGPL-3.0):
  *   - nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiNotificationService
- *   - nodomain.freeyourgadget.gadgetbridge.service.NotificationListener (Android NLS bridge)
+ *   - nodomain.freeyourgadget.gadgetbridge.externalevents.NotificationListener (Android NLS bridge)
+ *   - nodomain.freeyourgadget.gadgetbridge.externalevents.PhoneCallReceiver (incoming calls)
+ *
+ * Forwarding itself is fully native: the NotificationListenerService filters,
+ * coalesces and sends to the band on its own, even before JS is loaded. This
+ * object only exposes settings + a manual push for testing.
  */
 
 import type { HybridObject } from 'react-native-nitro-modules';
@@ -23,18 +28,35 @@ export interface HybridNotificationBridge
   extends HybridObject<{ android: 'kotlin' }> {
   readonly notificationAccessGranted: boolean;
 
+  /** Synchronous check used by onboarding (same value as `notificationAccessGranted`). */
+  isNotificationAccessGranted(): boolean;
+
   /** Opens system settings screen for notification listener access. */
   requestAccess(): void;
 
-  /** Manually push a notification (used for testing + by the on-device NLS). */
+  /**
+   * Manually push a notification (debug / test). Dropped when the band is not
+   * connected — the listener never starts a connection.
+   */
   push(request: NotificationPushRequest): Promise<void>;
 
-  /** Active filter list. Apps not in this list are dropped before send. */
+  /**
+   * Allow-list. Returns every app that is allowed (`enabled: true`) plus every
+   * app that posted a notification since install but is not allowed
+   * (`enabled: false`). Apps not enabled are dropped before touching BLE.
+   */
   getFilters(): readonly NotificationFilter[];
   setFilter(filter: NotificationFilter): void;
   removeFilter(sourceId: string): void;
 
-  /** Mirrors the phone's DnD state to the band. */
+  /** Drop notifications (and call alerts) that the phone's Do Not Disturb suppresses. */
   setMuteWhenDnd(enabled: boolean): void;
   readonly muteWhenDnd: boolean;
+
+  /**
+   * Incoming-call alerts on the band (ringing → band shows caller, band
+   * reject → end call / silence ringer). Default: true.
+   */
+  setCallAlertsEnabled(enabled: boolean): void;
+  readonly callAlertsEnabled: boolean;
 }

@@ -1,71 +1,62 @@
 /*  Copyright (C) 2026 kidneyweakx
  *  AGPL-3.0-or-later. See LICENSE, NOTICE.md.
+ *
+ *  JS surface over MediaSessionTracker. Band buttons are dispatched to the
+ *  active Android media session natively; onCommand only reports them.
  */
 package com.margelo.nitro.miband9active
 
-import com.kidneyweakx.miband9active.DriverHolder
-import com.kidneyweakx.miband9active.xiaomi.services.MusicCommands
-import java.util.concurrent.CopyOnWriteArrayList
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.launch
-import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto
+import com.kidneyweakx.miband9active.media.MediaSessionTracker
+import com.kidneyweakx.miband9active.xiaomi.notifications.BandEventRouter
 
 class HybridMusicBridge : HybridHybridMusicBridgeSpec() {
 
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val listeners = CopyOnWriteArrayList<(MusicCommand) -> Unit>()
-    private var subJob: Job? = null
+    init {
+        BandEventRouter.ensureStarted()
+    }
 
     override fun pushNowPlaying(snapshot: MusicNowPlaying) {
-        val drv = DriverHolder.current ?: return
-        val info = XiaomiProto.MusicInfo.newBuilder()
-            .setState(if (snapshot.playing) 1 else 2)
-            .setVolume(50)
-            .setTrack(snapshot.title)
-            .setArtist(snapshot.artist)
-            .setPosition((snapshot.positionMs / 1000.0).toInt())
-            .setDuration((snapshot.durationMs / 1000.0).toInt())
-            .build()
-        scope.launch {
-            drv.sendCommand(
-                XiaomiProto.Command.newBuilder()
-                    .setType(MusicCommands.COMMAND_TYPE)
-                    .setSubtype(MusicCommands.CMD_INFO_SET)
-                    .setMusic(XiaomiProto.Music.newBuilder().setMusicInfo(info))
-                    .build(),
+        MediaSessionTracker.pushManual(
+            MediaSessionTracker.NowPlaying(
+                track = snapshot.title,
+                artist = snapshot.artist,
+                album = snapshot.album,
+                packageName = snapshot.app,
+                positionMs = snapshot.positionMs.toLong(),
+                durationMs = snapshot.durationMs.toLong(),
+                playing = snapshot.playing,
+            ),
+        )
+    }
+
+    override fun onCommand(listener: (command: MusicCommand) -> Unit): () -> Unit =
+        MediaSessionTracker.addListener { cmd ->
+            listener(
+                when (cmd) {
+                    MediaSessionTracker.BandMediaCommand.PLAY -> MusicCommand.PLAY
+                    MediaSessionTracker.BandMediaCommand.PAUSE -> MusicCommand.PAUSE
+                    MediaSessionTracker.BandMediaCommand.NEXT -> MusicCommand.NEXT
+                    MediaSessionTracker.BandMediaCommand.PREVIOUS -> MusicCommand.PREVIOUS
+                    MediaSessionTracker.BandMediaCommand.VOLUME_UP -> MusicCommand.VOLUMEUP
+                    MediaSessionTracker.BandMediaCommand.VOLUME_DOWN -> MusicCommand.VOLUMEDOWN
+                },
             )
         }
+
+    override fun getNowPlaying(): MusicNowPlaying? {
+        val np = MediaSessionTracker.nowPlaying() ?: return null
+        return MusicNowPlaying(
+            title = np.track,
+            artist = np.artist,
+            album = np.album,
+            app = np.packageName,
+            positionMs = np.positionMs.toDouble(),
+            durationMs = np.durationMs.toDouble(),
+            playing = np.playing,
+        )
     }
 
-    override fun onCommand(listener: (command: MusicCommand) -> Unit): () -> Unit {
-        listeners += listener
-        ensureSubscribed()
-        return { listeners -= listener }
-    }
-
-    private fun ensureSubscribed() {
-        if (subJob != null) return
-        val drv = DriverHolder.current ?: return
-        subJob = scope.launch {
-            drv.incoming.collect { msg ->
-                if (msg.type != MusicCommands.COMMAND_TYPE) return@collect
-                if (msg.subtype != MusicCommands.CMD_BUTTON_PRESSED) return@collect
-                val key = msg.command.music.mediaKey.key
-                val cmd = when (key) {
-                    0 -> MusicCommand.PLAY
-                    1 -> MusicCommand.PAUSE
-                    3 -> MusicCommand.PREVIOUS
-                    4 -> MusicCommand.NEXT
-                    5 -> if (msg.command.music.mediaKey.volume >= 50) MusicCommand.VOLUMEUP else MusicCommand.VOLUMEDOWN
-                    else -> null
-                }
-                if (cmd != null) listeners.forEach { it(cmd) }
-            }
-        }
+    override fun refresh() {
+        MediaSessionTracker.refresh()
     }
 }

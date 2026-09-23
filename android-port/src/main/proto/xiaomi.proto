@@ -51,6 +51,9 @@ message Auth {
 
 message PhoneNonce {
   required bytes nonce = 1;
+  // Phone identity, required by Wear OS watches (eg. Xiaomi Watch 5) - without it they
+  // reply with a status instead of a WatchNonce. Unset elsewhere, so the wire format is unchanged.
+  optional string deviceId = 2;
 }
 
 message WatchNonce {
@@ -147,7 +150,10 @@ message System {
   // 2, 59
   optional VibrationTest vibrationTestCustom = 41;
 
-  // 2, 47
+  // 2, 61 - reference Vibrator.Removal (delete stored patterns by id)
+  optional VibrationRemove vibrationRemove = 42;
+
+  // 2, 47 - reference VibratorError (response code)
   optional VibrationPatternAck vibrationPatternAck = 43;
 
   // 2, 78
@@ -353,6 +359,21 @@ message PhoneSilentMode {
   optional bool silent = 1;
 }
 
+// Notification / vibration category ids shared by CustomVibrationPattern.type and
+// VibrationNotificationType.notificationType. The fields stay uint32 - proto2 closed enums drop
+// unknown values (and the raw int) on the wire - so map to this enum with forNumber() in code.
+enum VibrationType {
+  VIBRATION_TYPE_NONE = 0;
+  VIBRATION_TYPE_CALL = 1;          // incoming calls (confirmed: Double -> 1)
+  VIBRATION_TYPE_TASK = 2;          // task reminders (confirmed)
+  VIBRATION_TYPE_ALARM = 3;         // alarms / clock
+  VIBRATION_TYPE_NOTIFICATION = 4;  // notifications
+  VIBRATION_TYPE_STANDING = 5;      // standing / sedentary reminders
+  VIBRATION_TYPE_SMS = 6;           // sms / messages
+  VIBRATION_TYPE_GOAL = 7;          // goal
+  VIBRATION_TYPE_EVENT = 8;         // events / calendar (confirmed)
+}
+
 message VibrationPatterns {
   repeated VibrationNotificationType notificationType = 1;
   optional uint32 unknown2 = 2; // 50, max patterns?
@@ -362,34 +383,34 @@ message VibrationPatterns {
 message CustomVibrationPattern {
   optional uint32 id = 1;
   optional string name = 2;
+  // The band never populates the segments on a GET response, only on create/update (phone -> watch)
   repeated Vibration vibration = 3;
-  optional uint32 unknown4 = 4; // 1 on creation
+  optional uint32 type = 4; // see VibrationType
 }
 
 message VibrationNotificationType {
-  // 1 incoming calls
-  // 2 events // TODO confirm which one is events, which one is schedule
-  // 3 alarms
-  // 4 notifications
-  // 5 standing reminder
-  // 6 sms
-  // 7 goal
-  // 8 events // TODO confirm which one is events, which one is schedule
-  optional uint32 notificationType = 1;
-  optional uint32 preset = 2;
+  optional uint32 notificationType = 1; // see VibrationType
+  optional uint32 preset = 2; // reference VibratorItem.id - the assigned vibrator id (0 = default)
 }
 
 message VibrationTest {
   repeated Vibration vibration = 1;
 }
 
+// reference VibratorError: response code: 0 OK, 1 NUMBER_LIMIT, 2 ID_NOT_EXIST
 message VibrationPatternAck {
-  optional uint32 status = 1; // 0
+  optional uint32 status = 1;
+}
+
+// reference Vibrator.Removal: delete stored patterns by id
+message VibrationRemove {
+  repeated uint32 id = 1;
 }
 
 message Vibration {
-  optional uint32 vibrate = 1; // 0/1
-  optional uint32 ms = 2;
+  optional uint32 vibrate = 1;  // reference Segment.on (0/1)
+  optional uint32 ms = 2;       // reference Segment.duration
+  optional uint32 strength = 3; // reference Segment.strength
 }
 
 message DeviceActivityState {
@@ -529,6 +550,11 @@ message Health {
 
   // 8,45 enable | 8, 46 disable | 8, 47 periodic
   optional RealTimeStats realTimeStats = 39;
+
+  // 8, 53 -- raw sensor batches (SaA synthetic workout, ~100 Hz, watch -> phone)
+  optional RawSensorBatch rawSensorBatch = 15;
+  // 8, 49 -- ack sent by phone after every ~10 batches
+  optional RawSensorAck rawSensorAck = 41;
 }
 
 message UserInfo {
@@ -549,8 +575,20 @@ message ActivitySyncRequestToday {
 
 message SpO2 {
   optional uint32 unknown1 = 1; // 1
-  optional bool allDayTracking = 2;
+  // Was bool allDayTracking: the band uses a numeric mode instead
+  // (0 = off, 1 = sleep-only, 2 = all-day). Sending bool true (1)
+  // enabled sleep-only tracking instead of all-day tracking.
+  // Note: sleep-only is valid on the wire but is not exposed in
+  // the on-watch UI nor in the vendor app UI of Mi Band 10,
+  // so a band left in that state just looks off to the user.
+  optional Spo2Mode mode = 2;
   optional Spo2AlarmLow alarmLow = 4;
+}
+
+enum Spo2Mode {
+  SPO2_MODE_OFF = 0;
+  SPO2_MODE_SLEEP_ONLY = 1;
+  SPO2_MODE_ALL_DAY = 2;
 }
 
 message Spo2AlarmLow {
@@ -609,18 +647,25 @@ message VitalityScore {
 
 message WorkoutStatusWatch {
   optional uint32 timestamp = 1; // seconds
+  optional WorkoutStatusWatchSport sportInfo = 2;
   optional uint32 sport = 3;
   optional uint32 status = 4; // 0 started, 1 resumed, 2 paused, 3 finished
   optional bytes activityFileIds = 5;
-  optional uint32 unknown6 = 6; // 2
+  optional uint32 unknown6 = 6; // 2; 3 in SaA synthetic-workout mode
   optional uint32 unknown10 = 10; // 0
+}
+
+message WorkoutStatusWatchSport {
+  optional uint32 type = 1; // 16 in SaA synthetic mode
 }
 
 message WorkoutOpenWatch {
   // This is only called when gps is needed?
   // 1 outdoor running, 2 walking, 3 hiking, 4 trekking, 5 trail run, 6 outdoor cycling
+  // Synthetic SaA workout (Mi Band 10): sport=810, unknown2=2, unknown3=810
   optional uint32 sport = 1;
   optional uint32 unknown2 = 2; // 2
+  optional uint32 mode = 3; // mirrors sport for SaA synthetic mode
 }
 
 message WorkoutOpenReply {
@@ -667,6 +712,30 @@ message RealTimeStats {
   optional uint32 heartRate = 4;
   optional uint32 unknown5 = 5; // 0 probably moving time
   optional uint32 standingHours = 6;
+}
+
+// SaA raw-sensor batch sent by band during a synthetic workout (subtype 53
+// = AstroBox FitnessID.WEAR_SENSOR_DATA). Each batch carries 10 accel + 10 gyro samples.
+// Mirrors AstroBox AxisSensor (wear_fitness.proto:757); we use optional vs required only.
+message AxisSensor {
+  optional uint64 timestamp = 1; // varint, likely nanoseconds since boot
+  optional float x = 2; // m/s^2 (fixed32 little-endian)
+  optional float y = 3;
+  optional float z = 4;
+}
+
+// Field tags 5/6 are what Mi Band 10 emits on the wire — they do NOT match
+// AstroBox WearSensorData (accel/gyro = 1/2 there), so this stays a separate message.
+message RawSensorBatch {
+  repeated AxisSensor accel = 5;
+  repeated AxisSensor gyro = 6; // not consumed today
+}
+
+// Ack sent by phone every ~10 batches (subtype 49 = AstroBox FitnessID.PHONE_SPORT_DATA_V2A).
+message RawSensorAck {
+  optional uint32 counter = 1; // 1..N
+  optional uint32 unknown2 = 2; // 0
+  optional uint32 unknown3 = 3; // 0
 }
 
 //
