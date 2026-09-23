@@ -24,19 +24,22 @@ object XiaomiCrypto {
     private val MIWEAR_AUTH = "miwear-auth".toByteArray(Charsets.UTF_8)
 
     /**
-     * Parse the user-pasted auth key into 16 bytes.
-     *   - bare hex (32 chars)
-     *   - "0x"-prefixed hex (34 chars)
-     *   - numeric user-id (plaintext fallback) — returns null so caller uses
-     *     the clear-text handshake path.
+     * Normalise a user-pasted auth key to 32 lowercase hex chars, or null.
+     * Accepts an optional `0x` prefix, whitespace, `:` and `-` separators and
+     * upper case (Gadgetbridge's getSecretKey accepts with/without `0x`).
      */
-    fun parseAuthKey(raw: String): ByteArray? {
-        val trimmed = raw.trim()
-        if (trimmed.isEmpty()) return null
-        val hex = if (trimmed.startsWith("0x")) trimmed.substring(2) else trimmed
-        if (hex.length != 32) return null
-        return runCatching { hex.hexToBytes() }.getOrNull()
+    fun normalizeAuthKeyHex(raw: String): String? {
+        var s = raw.trim()
+        if (s.startsWith("0x") || s.startsWith("0X")) s = s.substring(2)
+        s = s.filterNot { it.isWhitespace() || it == ':' || it == '-' }.lowercase()
+        if (s.length != 32) return null
+        if (!s.all { it in '0'..'9' || it in 'a'..'f' }) return null
+        return s
     }
+
+    /** Parse the user-pasted auth key into 16 bytes, or null if invalid. */
+    fun parseAuthKey(raw: String): ByteArray? =
+        normalizeAuthKeyHex(raw)?.hexToBytes()
 
     /**
      * Build the 64-byte derived material used to seed the encrypted session.

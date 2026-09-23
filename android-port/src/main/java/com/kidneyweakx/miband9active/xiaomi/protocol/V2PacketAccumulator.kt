@@ -27,6 +27,7 @@ class V2PacketAccumulator {
                     out += r.packet
                     consume(r.consumed)
                 }
+                is XiaomiSppPacketV2.ParseResult.Skip -> consume(r.consumed)
                 XiaomiSppPacketV2.ParseResult.Invalid -> {
                     val next = XiaomiSppPacketV2.findNextPacketOffset(snapshot)
                     if (next < 0) {
@@ -39,6 +40,11 @@ class V2PacketAccumulator {
             }
         }
         return out
+    }
+
+    /** Drop any partially buffered frame (called on every new link). */
+    fun reset() {
+        buffer.reset()
     }
 
     private fun consume(n: Int) {

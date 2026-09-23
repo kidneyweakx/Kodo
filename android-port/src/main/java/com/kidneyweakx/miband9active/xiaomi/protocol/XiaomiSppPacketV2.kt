@@ -134,6 +134,14 @@ sealed class XiaomiSppPacketV2(val packetType: Int, val sequenceNumber: Int) {
     sealed class ParseResult {
         data object Incomplete : ParseResult()
         data class Complete(val packet: XiaomiSppPacketV2, val consumed: Int) : ParseResult()
+        /**
+         * Header was valid and the full frame is buffered, but the frame is
+         * unusable (CRC mismatch / unknown type / undecodable body). Skip the
+         * whole declared frame — XiaomiBleProtocolV2.processPacket (L311-338)
+         * returns Complete(packetSize) when decode() yields null.
+         */
+        data class Skip(val consumed: Int) : ParseResult()
+        /** Buffer does not start with the preamble — resync. */
         data object Invalid : ParseResult()
     }
 
@@ -158,22 +166,28 @@ sealed class XiaomiSppPacketV2(val packetType: Int, val sequenceNumber: Int) {
             if (buf.remaining() < payloadLen) return ParseResult.Incomplete
 
             val payload = ByteArray(payloadLen).also { buf.get(it) }
-            if (crc16Arc(payload) != givenCrc) return ParseResult.Invalid
+            val frameLen = 8 + payloadLen
+            if (crc16Arc(payload) != givenCrc) return ParseResult.Skip(frameLen)
 
             val packet = when (packetType) {
                 PACKET_TYPE_ACK -> Ack(seq)
-                PACKET_TYPE_SESSION_CONFIG -> SessionConfig.decode(seq, payload) ?: return ParseResult.Invalid
-                PACKET_TYPE_DATA -> Data.decode(seq, payload) ?: return ParseResult.Invalid
-                else -> return ParseResult.Invalid
+                PACKET_TYPE_SESSION_CONFIG -> SessionConfig.decode(seq, payload) ?: return ParseResult.Skip(frameLen)
+                PACKET_TYPE_DATA -> Data.decode(seq, payload) ?: return ParseResult.Skip(frameLen)
+                else -> return ParseResult.Skip(frameLen)
             }
-            return ParseResult.Complete(packet, 8 + payloadLen)
+            return ParseResult.Complete(packet, frameLen)
         }
 
-        /** Locate the next preamble inside [buffer], returning its offset or -1. */
+        /**
+         * Locate the next (possibly partial) preamble inside [buffer], returning
+         * its offset or -1. A lone 0xA5 as the very last byte counts: its
+         * second preamble byte may arrive in the next notification, and
+         * dropping it would lose the whole next frame.
+         */
         fun findNextPacketOffset(buffer: ByteArray, after: Int = 1): Int {
             var i = after
-            while (i < buffer.size - 1) {
-                if (buffer[i] == PREAMBLE[0] && buffer[i + 1] == PREAMBLE[1]) return i
+            while (i < buffer.size) {
+                if (buffer[i] == PREAMBLE[0] && (i == buffer.size - 1 || buffer[i + 1] == PREAMBLE[1])) return i
                 i++
             }
             return -1

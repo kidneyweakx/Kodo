@@ -29,9 +29,32 @@ export interface BandLinkScanOptions {
 }
 
 export interface BandLinkPairOptions {
-  /** 32-byte hex string. If empty, the native side tries the plaintext numeric path. */
+  /**
+   * 16-byte auth key as 32 hex chars. Native normalises `0x` prefix, spaces,
+   * colons, dashes and upper case before validating.
+   */
   readonly authKey: string;
 }
+
+/**
+ * Error-message prefixes used by `pair()` / `connect()` rejections. The
+ * rejected Error's `message` STARTS WITH one of these followed by `:`.
+ *   AUTH_KEY_INVALID  key is not 32 hex chars after normalising
+ *   AUTH_REJECTED     band's HMAC didn't match / band refused auth (wrong key)
+ *   BT_OFF            Bluetooth adapter missing or disabled
+ *   PERMISSION        SecurityException (BLUETOOTH_CONNECT/SCAN not granted)
+ *   TIMEOUT           band never answered (out of range / bonded to another app)
+ *   GATT              any other GATT failure (incl. V2 service missing)
+ *   NOT_PAIRED        connect() with no stored band
+ */
+export type BandLinkErrorCode =
+  | 'AUTH_KEY_INVALID'
+  | 'AUTH_REJECTED'
+  | 'BT_OFF'
+  | 'PERMISSION'
+  | 'TIMEOUT'
+  | 'GATT'
+  | 'NOT_PAIRED';
 
 export interface HybridBandLink
   extends HybridObject<{ android: 'kotlin' }> {
@@ -42,13 +65,32 @@ export interface HybridBandLink
 
   // ----- discovery + pairing -----
   scan(options: BandLinkScanOptions): Promise<readonly DiscoveredBand[]>;
+  /** Stops an in-flight scan; the pending `scan()` promise resolves early with results so far. */
   stopScan(): void;
+  /**
+   * Real GATT connect + Xiaomi V2 encrypted auth. Resolves only once the band
+   * is authenticated, then persists the band natively (survives restart).
+   * Rejects with an Error whose message starts with a `BandLinkErrorCode:`.
+   * On failure nothing is persisted and the GATT client is closed.
+   */
   pair(deviceId: string, options: BandLinkPairOptions): Promise<PairedBand>;
+  /** Clears the stored band, disables periodic sync, disconnects, removes the system bond. */
   forget(): Promise<void>;
 
   // ----- session lifecycle -----
+  /**
+   * Connects to the natively stored band; resolves when authenticated.
+   * Rejects with `NOT_PAIRED:` when no band is stored, else same codes as pair().
+   */
   connect(): Promise<void>;
+  /** User-initiated disconnect. Also disarms passive auto-reconnect. */
   disconnect(): void;
+
+  // ----- background + band housekeeping -----
+  /** Enable/disable WorkManager periodic sync. intervalMinutes is clamped to >= 30. */
+  setPeriodicSync(enabled: boolean, intervalMinutes: number): void;
+  /** Ask the band for a fresh battery reading (no-op when not connected). */
+  requestBattery(): void;
 
   // ----- sync -----
   /**
