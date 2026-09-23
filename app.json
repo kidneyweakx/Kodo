@@ -8,13 +8,7 @@
     "scheme": "kodo",
     "owner": "kidneyweakx",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "icon": "./assets/icon.png",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0A0A0B"
-    },
     "android": {
       "package": "com.kidneyweakx.kodo",
       "versionCode": 1,
@@ -42,16 +36,14 @@
         "expo-build-properties",
         {
           "android": {
-            "minSdkVersion": 26,
-            "compileSdkVersion": 36,
-            "targetSdkVersion": 35,
-            "kotlinVersion": "2.1.20"
+            "minSdkVersion": 26
           }
         }
       ],
       "./plugins/with-project-build-gradle.js",
       "./plugins/with-android-port.js",
       "./plugins/with-manifest.js",
+      "./plugins/with-release-signing.js",
       "expo-router",
       [
         "expo-localization",
@@ -70,6 +62,17 @@
         {
           "icon": "./assets/notification-icon.png",
           "color": "#7CF5C4"
+        }
+      ],
+      "expo-image",
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "imageWidth": 200,
+          "backgroundColor": "#0A0A0B"
         }
       ]
     ],
