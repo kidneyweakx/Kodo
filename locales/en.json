@@ -133,5 +133,245 @@
     "btDenied": "Bluetooth permission denied",
     "notFound": "Band not found",
     "authFailed": "Pairing failed — check the auth key"
+  },
+  "settings": {
+    "title": "Settings",
+    "hub": {
+      "band": "Band",
+      "app": "App"
+    },
+    "hero": {
+      "notPaired": "No band paired",
+      "pair": "Pair a band",
+      "syncNow": "Sync now",
+      "syncing": "Syncing…",
+      "lastSync": "Last sync {{when}}",
+      "never": "never",
+      "charging": "Charging",
+      "battery": "Battery"
+    },
+    "state": {
+      "connected": "Connected",
+      "connecting": "Connecting…",
+      "scanning": "Scanning…",
+      "error": "Connection error",
+      "disconnected": "Offline"
+    },
+    "nav": {
+      "device": {
+        "title": "Device & display",
+        "body": "Wrist raise, do not disturb, clock"
+      },
+      "health": {
+        "title": "Health monitoring",
+        "body": "Heart rate, SpO₂, stress, reminders, goals"
+      },
+      "alarms": {
+        "title": "Alarms",
+        "body": "Band alarms and smart wake"
+      },
+      "notifications": {
+        "title": "Notifications & calls",
+        "body": "Forwarding, calls, music control"
+      },
+      "weather": {
+        "title": "Weather & calendar",
+        "body": "What the band shows from your phone"
+      },
+      "watchface": {
+        "title": "Watch faces",
+        "body": "Install and switch faces"
+      },
+      "sync": {
+        "title": "Sync & data",
+        "body": "Background sync, Health Connect, storage"
+      },
+      "appearance": {
+        "title": "Appearance & language",
+        "body": "Theme, contrast, language"
+      },
+      "about": {
+        "title": "About",
+        "body": "Version, license, credits"
+      }
+    },
+    "danger": {
+      "title": "Danger zone",
+      "unpair": "Unpair band",
+      "unpairBody": "Removes the key and stops syncing. You'll pair again from scratch.",
+      "clear": "Erase all data",
+      "clearBody": "Band, preferences and every synced sample on this phone.",
+      "confirm": "Are you sure?",
+      "cancel": "Cancel"
+    },
+    "appearance": {
+      "mode": "Appearance",
+      "modeBody": "Follow the system or force light / dark",
+      "modes": {
+        "auto": "Auto",
+        "light": "Light",
+        "dark": "Dark"
+      },
+      "theme": "Accent theme",
+      "tint": "Tint intensity",
+      "tintBody": "How much of the accent bleeds into surfaces",
+      "tints": {
+        "subtle": "Subtle",
+        "balanced": "Balanced",
+        "vivid": "Vivid"
+      },
+      "contrast": "Increase contrast",
+      "contrastBody": "Stronger text and borders",
+      "language": "Language",
+      "languageBody": "Also sent to the band on next connect"
+    },
+    "about": {
+      "version": "Version",
+      "build": "Build",
+      "license": "License",
+      "upstream": "Built on",
+      "upstreamBody": "Protocol work by the Gadgetbridge project",
+      "source": "Source code",
+      "privacy": "Privacy",
+      "privacyBody": "No cloud, no analytics — everything stays on this phone"
+    },
+    "sync": {
+      "background": "Background sync",
+      "auto": "Sync automatically",
+      "autoBody": "Android runs it when the battery isn't low",
+      "interval": "Every",
+      "hc": "Health Connect",
+      "hcBody": "Share steps, heart rate, SpO₂ and sleep with Google Fit, Samsung Health, Fitbit and others.",
+      "hcStatus": {
+        "available": "{{count}} of 8 data types shared",
+        "none": "Not connected",
+        "updateRequired": "Install or update Health Connect",
+        "unavailable": "Not supported on this phone"
+      },
+      "hcConnect": "Connect",
+      "hcManage": "Choose data",
+      "hcExport": "Export last 7 days",
+      "hcExported": "{{count}} records written",
+      "power": "Battery",
+      "powerOn": "Unrestricted — background sync is reliable",
+      "powerOff": "Android may delay background sync",
+      "data": "Data on this phone",
+      "lastSample": "Newest sample",
+      "noSample": "No data yet",
+      "clear": "Delete synced data",
+      "clearBody": "Removes every sample stored on this phone. The band keeps nothing it already sent."
+    },
+    "common": {
+      "unknown": "Connect the band to read this",
+      "pending": "Will be sent on next connect",
+      "off": "Off",
+      "save": "Save",
+      "saving": "Saving…",
+      "failed": "Couldn't reach the band"
+    },
+    "device": {
+      "info": "Device",
+      "model": "Model",
+      "firmware": "Firmware",
+      "serial": "Serial",
+      "time": "Time & language",
+      "clock24": "24-hour clock",
+      "language": "Band language",
+      "languageAuto": "Follow phone",
+      "syncClock": "Sync time now",
+      "synced": "Time synced",
+      "camera": "Camera remote",
+      "cameraBody": "Take photos from the band's camera app",
+      "gps": "Phone GPS for workouts",
+      "gpsBody": "Share the phone's location when the band starts an outdoor workout"
+    },
+    "health": {
+      "hr": "Heart rate",
+      "hrInterval": "Measurement",
+      "intervals": {
+        "off": "Off",
+        "smart": "Smart",
+        "1m": "1 min",
+        "10m": "10 min",
+        "30m": "30 min"
+      },
+      "hrSleep": "Use heart rate for sleep",
+      "hrSleepBody": "More accurate sleep stages, slightly more battery",
+      "breathing": "Sleep breathing quality",
+      "hrHigh": "High heart rate alert",
+      "hrLow": "Low heart rate alert",
+      "spo2": "Blood oxygen",
+      "spo2AllDay": "All-day SpO₂",
+      "spo2Low": "Low SpO₂ alert",
+      "stress": "Stress",
+      "stressAllDay": "All-day stress",
+      "relax": "Relax reminder",
+      "sedentary": "Sedentary reminder",
+      "sedentaryBody": "Nudges you to move after an hour of sitting",
+      "from": "From",
+      "to": "Until",
+      "lunchBreak": "Pause over lunch (12–14)",
+      "goals": "Goals & profile",
+      "goalsBody": "Used by the band for calories and goal alerts. Stays on this phone and the band.",
+      "stepGoal": "Daily steps",
+      "goalNotify": "Goal reached alert",
+      "height": "Height (cm)",
+      "weight": "Weight (kg)",
+      "birthday": "Birthday (YYYY-MM-DD)",
+      "gender": "Gender",
+      "genders": {
+        "male": "Male",
+        "female": "Female",
+        "other": "Other"
+      },
+      "profileMissing": "Fill in every field to send your profile"
+    },
+    "alarms": {
+      "slots": "{{used}} / {{max}} alarms",
+      "add": "Add alarm",
+      "empty": "No alarms on the band",
+      "once": "Once",
+      "daily": "Every day",
+      "weekdays": "Weekdays",
+      "weekend": "Weekends",
+      "smart": "Smart wake",
+      "smartBody": "Wakes you in light sleep up to 30 min early",
+      "repeat": "Repeat",
+      "delete": "Delete alarm",
+      "full": "All alarm slots are used",
+      "days": "Mon,Tue,Wed,Thu,Fri,Sat,Sun"
+    },
+    "weather": {
+      "current": "Weather on the band",
+      "none": "No weather received yet",
+      "updated": "Updated {{when}}",
+      "source": "Source",
+      "sourceBody": "Any app that supports Gadgetbridge weather (Breezy Weather, etc.) can send weather here, or use OpenWeatherMap below.",
+      "unit": "Temperature unit",
+      "owm": "OpenWeatherMap",
+      "owmBody": "Polls at most every 6 hours, only on Wi-Fi or mobile data when the battery isn't low.",
+      "owmKey": "API key",
+      "owmLat": "Latitude",
+      "owmLon": "Longitude",
+      "owmName": "Place name",
+      "owmRefresh": "Fetch now",
+      "pushNow": "Send to band",
+      "calendar": "Calendar",
+      "calendarSync": "Show upcoming events",
+      "calendarPerm": "Needs calendar access",
+      "lookahead": "Days ahead",
+      "allDay": "Include all-day events",
+      "calendarSynced": "{{count}} events sent"
+    },
+    "watchface": {
+      "installed": "On the band",
+      "install": "Install from file",
+      "installing": "Installing… {{pct}}%",
+      "active": "Active",
+      "setActive": "Use",
+      "remove": "Remove",
+      "empty": "Connect the band to list its faces",
+      "installed_ok": "Installed {{name}}"
+    }
   }
 }

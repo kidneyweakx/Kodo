@@ -270,3 +270,9 @@ export function useTheme(): ThemeContextValue {
   if (!ctx) throw new Error('useTheme must be used inside <ThemeProvider>');
   return ctx;
 }
+
+/** Accent of a theme without switching to it — for the picker swatches. */
+export const themeSwatch = (id: ThemeId, mode: 'light' | 'dark'): { readonly accent: string; readonly background: string } => {
+  const palette = THEMES[id][mode];
+  return { accent: palette.accent, background: palette.background.tertiary };
+};

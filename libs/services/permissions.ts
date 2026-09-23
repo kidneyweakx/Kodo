@@ -131,6 +131,17 @@ export const permissions = {
     }
   },
 
+  async requestCalendar(): Promise<boolean> {
+    if (!isAndroid) return true;
+    const id = resolvePermission('READ_CALENDAR');
+    if (!id) return true;
+    try {
+      return (await PermissionsAndroid.request(id)) === PermissionsAndroid.RESULTS.GRANTED;
+    } catch {
+      return false;
+    }
+  },
+
   async hasPostNotifications(): Promise<boolean> {
     if (!isAndroid) return true;
     const id = resolvePermission('POST_NOTIFICATIONS');

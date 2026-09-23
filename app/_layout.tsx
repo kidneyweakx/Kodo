@@ -29,6 +29,7 @@ function NavStack() {
         <Stack.Screen name="index" />
         <Stack.Screen name="(onboarding)" options={{ animation: 'fade' }} />
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+        <Stack.Screen name="(settings)" />
       </Stack>
     </>
   );

@@ -17,11 +17,13 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\""
   },
   "dependencies": {
+    "@react-native-community/datetimepicker": "9.1.0",
     "expo": "~57.0.24",
     "expo-blur": "~57.0.3",
     "expo-build-properties": "~57.0.21",
     "expo-clipboard": "~57.0.2",
     "expo-constants": "~57.0.19",
+    "expo-document-picker": "~57.0.2",
     "expo-font": "~57.0.4",
     "expo-haptics": "~57.0.3",
     "expo-image": "~57.0.5",

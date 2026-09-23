@@ -3,7 +3,9 @@
     "name": "Kodō",
     "slug": "kodo",
     "version": "0.0.1",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "orientation": "portrait",
     "scheme": "kodo",
     "owner": "kidneyweakx",
@@ -62,7 +64,10 @@
       [
         "expo-localization",
         {
-          "supportedLocales": ["en", "zh-Hant"]
+          "supportedLocales": [
+            "en",
+            "zh-Hant"
+          ]
         }
       ],
       [
@@ -88,7 +93,8 @@
           "imageWidth": 200,
           "backgroundColor": "#0A0A0B"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true

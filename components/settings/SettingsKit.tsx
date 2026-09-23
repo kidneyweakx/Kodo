@@ -146,7 +146,7 @@ export function SettingsSwitch({
   const onAccent = readableTextOn(theme.accent);
 
   useEffect(() => {
-    progress.value = withSpring(value ? 1 : 0, Motion.spring.press);
+    progress.set(withSpring(value ? 1 : 0, Motion.spring.press));
   }, [value, progress]);
 
   const trackStyle = useAnimatedStyle(() => ({
@@ -222,13 +222,16 @@ export function SettingsItem({
   const scale = useSharedValue(1);
   const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
+  // An explicit onPress wins (e.g. open an editor); otherwise a switch row
+  // toggles on a tap anywhere in the row.
   const handlePress =
-    trailing.kind === 'switch'
+    onPress ??
+    (trailing.kind === 'switch'
       ? () => {
           void hapticsBridge.fire('selection');
           trailing.onChange(!trailing.value);
         }
-      : onPress;
+      : undefined);
   const interactive = !!handlePress && !disabled;
 
   return (
@@ -236,13 +239,13 @@ export function SettingsItem({
       disabled={!interactive}
       onPress={handlePress}
       onPressIn={() => {
-        scale.value = withTiming(0.97, { duration: Motion.duration.micro });
+        scale.set(withTiming(0.97, { duration: Motion.duration.micro }));
       }}
       onPressOut={() => {
-        scale.value = withSpring(1, Motion.spring.press);
+        scale.set(withSpring(1, Motion.spring.press));
       }}
       android_ripple={interactive ? { color: theme.glassBorder, borderless: false } : undefined}
-      accessibilityRole={trailing.kind === 'switch' ? 'switch' : interactive ? 'button' : undefined}
+      accessibilityRole={trailing.kind === 'switch' && !onPress ? 'switch' : interactive ? 'button' : undefined}
       accessibilityState={
         trailing.kind === 'switch' ? { checked: trailing.value, disabled: !!disabled } : { disabled: !!disabled }
       }
@@ -328,7 +331,7 @@ export function SettingsChoice<T extends string | number>({
   const x = useSharedValue(index * segment);
 
   useEffect(() => {
-    x.value = withSpring(index * segment, Motion.spring.press);
+    x.set(withSpring(index * segment, Motion.spring.press));
   }, [index, segment, x]);
 
   const pillStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
@@ -419,14 +422,16 @@ export function SettingsSlider({
   );
   const stepPx = count > 1 ? width / (count - 1) : 0;
   const x = useSharedValue(nearest * stepPx);
-  const [preview, setPreview] = useState(nearest);
+  // Index under the finger while dragging; null = show the committed value.
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const preview = dragIndex ?? nearest;
 
   useEffect(() => {
-    x.value = withSpring(nearest * stepPx, Motion.spring.press);
-    setPreview(nearest);
+    x.set(withSpring(nearest * stepPx, Motion.spring.press));
   }, [nearest, stepPx, x]);
 
   const commit = (i: number) => {
+    setDragIndex(null);
     const next = stops[i];
     if (next === undefined || next === value) return;
     void hapticsBridge.fire('selection');
@@ -443,19 +448,19 @@ export function SettingsSlider({
     .enabled(!disabled && width > 0)
     .onUpdate((e) => {
       const px = Math.min(width, Math.max(0, e.x));
-      x.value = px;
-      scheduleOnRN(setPreview, snapTo(px));
+      x.set(px);
+      scheduleOnRN(setDragIndex, snapTo(px));
     })
     .onEnd(() => {
       const i = snapTo(x.value);
-      x.value = withSpring(i * stepPx, Motion.spring.press);
+      x.set(withSpring(i * stepPx, Motion.spring.press));
       scheduleOnRN(commit, i);
     });
   const tap = Gesture.Tap()
     .enabled(!disabled && width > 0)
     .onEnd((e) => {
       const i = snapTo(e.x);
-      x.value = withSpring(i * stepPx, Motion.spring.press);
+      x.set(withSpring(i * stepPx, Motion.spring.press));
       scheduleOnRN(commit, i);
     });
 

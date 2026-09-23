@@ -133,5 +133,245 @@
     "btDenied": "已拒絕藍牙權限",
     "notFound": "找不到手環",
     "authFailed": "配對失敗 — 請檢查授權金鑰"
+  },
+  "settings": {
+    "title": "設定",
+    "hub": {
+      "band": "手環",
+      "app": "App"
+    },
+    "hero": {
+      "notPaired": "尚未配對手環",
+      "pair": "配對手環",
+      "syncNow": "立即同步",
+      "syncing": "同步中…",
+      "lastSync": "上次同步 {{when}}",
+      "never": "從未",
+      "charging": "充電中",
+      "battery": "電量"
+    },
+    "state": {
+      "connected": "已連線",
+      "connecting": "連線中…",
+      "scanning": "掃描中…",
+      "error": "連線錯誤",
+      "disconnected": "離線"
+    },
+    "nav": {
+      "device": {
+        "title": "裝置與顯示",
+        "body": "抬腕亮屏、勿擾、時間"
+      },
+      "health": {
+        "title": "健康監測",
+        "body": "心率、血氧、壓力、提醒、目標"
+      },
+      "alarms": {
+        "title": "鬧鐘",
+        "body": "手環鬧鐘與智慧喚醒"
+      },
+      "notifications": {
+        "title": "通知與來電",
+        "body": "轉發、來電、音樂控制"
+      },
+      "weather": {
+        "title": "天氣與行事曆",
+        "body": "手環從手機取得的資訊"
+      },
+      "watchface": {
+        "title": "錶盤",
+        "body": "安裝與切換錶盤"
+      },
+      "sync": {
+        "title": "同步與資料",
+        "body": "背景同步、Health Connect、儲存"
+      },
+      "appearance": {
+        "title": "外觀與語言",
+        "body": "主題、對比、語言"
+      },
+      "about": {
+        "title": "關於",
+        "body": "版本、授權、致謝"
+      }
+    },
+    "danger": {
+      "title": "危險區",
+      "unpair": "解除配對",
+      "unpairBody": "移除金鑰並停止同步,之後需要重新配對。",
+      "clear": "清除所有資料",
+      "clearBody": "手環、偏好設定與這支手機上所有同步資料。",
+      "confirm": "確定要繼續?",
+      "cancel": "取消"
+    },
+    "appearance": {
+      "mode": "外觀模式",
+      "modeBody": "跟隨系統,或固定淺色 / 深色",
+      "modes": {
+        "auto": "自動",
+        "light": "淺色",
+        "dark": "深色"
+      },
+      "theme": "主題色",
+      "tint": "色調強度",
+      "tintBody": "主題色滲入背景的程度",
+      "tints": {
+        "subtle": "淡",
+        "balanced": "適中",
+        "vivid": "鮮明"
+      },
+      "contrast": "提高對比",
+      "contrastBody": "更清楚的文字與邊框",
+      "language": "語言",
+      "languageBody": "下次連線時也會同步到手環"
+    },
+    "about": {
+      "version": "版本",
+      "build": "組建",
+      "license": "授權",
+      "upstream": "基於",
+      "upstreamBody": "協定研究來自 Gadgetbridge 專案",
+      "source": "原始碼",
+      "privacy": "隱私",
+      "privacyBody": "不上雲、無分析 — 所有資料都留在這支手機"
+    },
+    "sync": {
+      "background": "背景同步",
+      "auto": "自動同步",
+      "autoBody": "電量不低時由 Android 排程執行",
+      "interval": "間隔",
+      "hc": "Health Connect",
+      "hcBody": "將步數、心率、血氧與睡眠分享給 Google Fit、三星健康、Fitbit 等 App。",
+      "hcStatus": {
+        "available": "已分享 {{count}} / 8 種資料",
+        "none": "尚未連接",
+        "updateRequired": "請安裝或更新 Health Connect",
+        "unavailable": "此手機不支援"
+      },
+      "hcConnect": "連接",
+      "hcManage": "選擇資料",
+      "hcExport": "匯出最近 7 天",
+      "hcExported": "已寫入 {{count}} 筆紀錄",
+      "power": "電池",
+      "powerOn": "不受限制 — 背景同步穩定",
+      "powerOff": "Android 可能延後背景同步",
+      "data": "手機上的資料",
+      "lastSample": "最新一筆資料",
+      "noSample": "尚無資料",
+      "clear": "刪除同步資料",
+      "clearBody": "刪除這支手機上所有樣本。手環不會保留已傳送的資料。"
+    },
+    "common": {
+      "unknown": "連接手環後讀取",
+      "pending": "將在下次連線時送出",
+      "off": "關",
+      "save": "儲存",
+      "saving": "儲存中…",
+      "failed": "無法連到手環"
+    },
+    "device": {
+      "info": "裝置",
+      "model": "型號",
+      "firmware": "韌體",
+      "serial": "序號",
+      "time": "時間與語言",
+      "clock24": "24 小時制",
+      "language": "手環語言",
+      "languageAuto": "跟隨手機",
+      "syncClock": "立即同步時間",
+      "synced": "已同步時間",
+      "camera": "相機遙控",
+      "cameraBody": "從手環的相機 App 拍照",
+      "gps": "運動時使用手機 GPS",
+      "gpsBody": "手環開始戶外運動時分享手機定位"
+    },
+    "health": {
+      "hr": "心率",
+      "hrInterval": "量測頻率",
+      "intervals": {
+        "off": "關",
+        "smart": "智慧",
+        "1m": "1 分",
+        "10m": "10 分",
+        "30m": "30 分"
+      },
+      "hrSleep": "以心率輔助睡眠監測",
+      "hrSleepBody": "睡眠分期更準確,稍微耗電",
+      "breathing": "睡眠呼吸品質",
+      "hrHigh": "心率過高提醒",
+      "hrLow": "心率過低提醒",
+      "spo2": "血氧",
+      "spo2AllDay": "全天血氧",
+      "spo2Low": "血氧過低提醒",
+      "stress": "壓力",
+      "stressAllDay": "全天壓力",
+      "relax": "放鬆提醒",
+      "sedentary": "久坐提醒",
+      "sedentaryBody": "坐滿一小時提醒你起來動一動",
+      "from": "開始",
+      "to": "結束",
+      "lunchBreak": "午休暫停(12–14)",
+      "goals": "目標與個人資料",
+      "goalsBody": "手環用來計算卡路里與目標提醒。只存在手機與手環。",
+      "stepGoal": "每日步數",
+      "goalNotify": "達成目標提醒",
+      "height": "身高(cm)",
+      "weight": "體重(kg)",
+      "birthday": "生日(YYYY-MM-DD)",
+      "gender": "性別",
+      "genders": {
+        "male": "男",
+        "female": "女",
+        "other": "其他"
+      },
+      "profileMissing": "填完所有欄位才能送出個人資料"
+    },
+    "alarms": {
+      "slots": "已用 {{used}} / {{max}} 個鬧鐘",
+      "add": "新增鬧鐘",
+      "empty": "手環上沒有鬧鐘",
+      "once": "僅一次",
+      "daily": "每天",
+      "weekdays": "平日",
+      "weekend": "週末",
+      "smart": "智慧喚醒",
+      "smartBody": "在淺眠時提早最多 30 分鐘叫醒你",
+      "repeat": "重複",
+      "delete": "刪除鬧鐘",
+      "full": "鬧鐘數量已達上限",
+      "days": "一,二,三,四,五,六,日"
+    },
+    "weather": {
+      "current": "手環上的天氣",
+      "none": "尚未收到天氣資料",
+      "updated": "更新於 {{when}}",
+      "source": "資料來源",
+      "sourceBody": "支援 Gadgetbridge 天氣的 App(如 Breezy Weather)都能把天氣傳過來,或使用下方的 OpenWeatherMap。",
+      "unit": "溫度單位",
+      "owm": "OpenWeatherMap",
+      "owmBody": "最多每 6 小時更新一次,只在有網路且電量不低時執行。",
+      "owmKey": "API 金鑰",
+      "owmLat": "緯度",
+      "owmLon": "經度",
+      "owmName": "地點名稱",
+      "owmRefresh": "立即取得",
+      "pushNow": "傳送到手環",
+      "calendar": "行事曆",
+      "calendarSync": "顯示即將到來的行程",
+      "calendarPerm": "需要行事曆權限",
+      "lookahead": "同步天數",
+      "allDay": "包含整天行程",
+      "calendarSynced": "已傳送 {{count}} 個行程"
+    },
+    "watchface": {
+      "installed": "手環上的錶盤",
+      "install": "從檔案安裝",
+      "installing": "安裝中… {{pct}}%",
+      "active": "使用中",
+      "setActive": "使用",
+      "remove": "移除",
+      "empty": "連接手環後列出錶盤",
+      "installed_ok": "已安裝 {{name}}"
+    }
   }
 }
