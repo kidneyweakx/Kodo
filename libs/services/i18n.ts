@@ -8,6 +8,7 @@
 import { I18n } from 'i18n-js';
 import { getLocales } from 'expo-localization';
 
+import { cache, cacheKeys } from '@/libs/services/cache';
 import en from '@/locales/en.json';
 import zhHant from '@/locales/zh-Hant.json';
 
@@ -16,6 +17,9 @@ export type SupportedLocale = 'zh-Hant' | 'en';
 export const SUPPORTED_LOCALES: readonly SupportedLocale[] = ['zh-Hant', 'en'] as const;
 
 const pickLocale = (): SupportedLocale => {
+  // An explicit choice (onboarding / Settings) wins over the system locale.
+  const saved = cache.getSync<SupportedLocale>(cacheKeys.language);
+  if (saved && SUPPORTED_LOCALES.includes(saved)) return saved;
   const device = getLocales();
   for (const entry of device) {
     const tag = entry.languageTag.toLowerCase();

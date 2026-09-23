@@ -20,49 +20,85 @@
   },
   "onboarding": {
     "welcome": {
-      "title": "用最輕的方式,認識你的小米手環 9 Active",
-      "body": "單機伴侶,不上雲,不追蹤。手機和手環一起省電。",
-      "cta": "開始使用"
+      "title": "小米手環 9 Active,不用上雲也好用",
+      "body": "三個步驟:找到手環、貼上金鑰、完成。所有資料都留在這支手機。",
+      "cta": "開始配對",
+      "points": {
+        "local": "本機儲存 · 資料不離開手機",
+        "battery": "省電設計 · 不常駐背景",
+        "single": "專為 Mi Band 9 Active 打造"
+      }
     },
-    "language": {
-      "title": "選擇語言",
-      "body": "稍後也可以在設定裡調整。",
-      "zhHant": "繁體中文",
-      "en": "English"
+    "connect": {
+      "title": "尋找你的手環",
+      "body": "喚醒手環並放在手機旁邊。",
+      "cta": "允許藍牙並搜尋",
+      "rescan": "重新搜尋",
+      "next": "使用這支手環",
+      "searching": "正在搜尋附近的手環…",
+      "found": "找到 {{count}} 支手環",
+      "bonded": "系統已知裝置",
+      "signal": {
+        "strong": "訊號強",
+        "ok": "訊號良好",
+        "weak": "訊號弱"
+      },
+      "permissionDenied": "需要藍牙權限才能找到手環。",
+      "openSettings": "開啟 App 設定",
+      "empty": {
+        "title": "還沒找到手環",
+        "tips": "• 點亮手環螢幕並靠近手機\n• 若小米運動健康正連著手環,請強制停止它(不要解除配對,否則金鑰會重置)\n• 開啟定位服務 — Android 藍牙掃描需要它"
+      },
+      "openLocation": "開啟定位設定"
     },
-    "bluetooth": {
-      "title": "藍牙存取",
-      "body": "需要藍牙和鄰近裝置權限才能跟手環通訊。不會蒐集位置資訊。",
-      "cta": "允許藍牙"
+    "key": {
+      "title": "貼上授權金鑰",
+      "body": "小米手環只接受持有 32 字元授權金鑰的 App。金鑰只存在這支手機。",
+      "placeholder": "32 個十六進位字元",
+      "paste": "貼上",
+      "valid": "金鑰格式正確",
+      "count": "{{count}} / 32",
+      "cta": "配對",
+      "help": "金鑰從哪裡來?",
+      "helpBody": "金鑰是手環綁定小米運動健康時產生的。Gadgetbridge 的教學說明如何取得(例如 Huafetcher 工具或小米運動健康的記錄檔)。",
+      "helpLink": "開啟 Gadgetbridge 教學",
+      "phase": {
+        "connecting": "正在連線手環…",
+        "authenticating": "正在驗證金鑰…",
+        "connected": "配對成功!"
+      },
+      "errors": {
+        "AUTH_KEY_INVALID": "金鑰格式不對 — 應為 32 個十六進位字元(0-9、a-f)。",
+        "AUTH_REJECTED": "手環拒絕了這把金鑰。請從小米運動健康重新取得 — 在那邊解除配對會產生新金鑰。",
+        "BT_OFF": "藍牙已關閉,請開啟後再試。",
+        "PERMISSION": "藍牙權限被撤銷,請允許後再試。",
+        "TIMEOUT": "手環沒有回應。請靠近手機,並強制停止小米運動健康 / Gadgetbridge 後重試。",
+        "GATT": "藍牙連線失敗,請切換藍牙開關後重試。",
+        "NOT_PAIRED": "請先選擇手環。",
+        "UNKNOWN": "配對失敗。"
+      }
+    },
+    "extras": {
+      "title": "最後幾項設定",
+      "body": "都是選用 — 之後可以在設定裡調整。",
+      "notif": {
+        "title": "轉發通知",
+        "body": "聊天、郵件、來電提醒直接顯示在手環。"
+      },
+      "post": {
+        "title": "App 通知",
+        "body": "同步狀態與尋找手機提醒。"
+      },
+      "battery": {
+        "title": "穩定的背景同步",
+        "body": "允許 Android 不受限地執行每 30 分鐘同步。"
+      },
+      "on": "已開啟",
+      "enable": "開啟",
+      "cta": "進入儀表板"
     },
     "notifications": {
-      "title": "通知存取",
-      "body": "將聊天、郵件、行事曆通知轉發到手環。要轉哪些 App 由你決定。",
       "cta": "前往設定"
-    },
-    "battery": {
-      "title": "讓我保持喚醒",
-      "body": "請將本 App 加入電池最佳化白名單,避免夜間同步中斷。",
-      "cta": "立即設定"
-    },
-    "scan": {
-      "title": "尋找你的手環",
-      "body": "請喚醒手環並靠近手機。只會顯示名稱為「Xiaomi Smart Band 9 Active」的裝置。",
-      "cta": "開始掃描",
-      "scanning": "掃描中…",
-      "empty": "還沒找到任何裝置。請確認已在小米穿戴 App 解除配對。",
-      "select": "配對"
-    },
-    "auth": {
-      "title": "安全配對",
-      "body": "貼上 32 位元組授權金鑰。我們不會把它送離裝置。",
-      "placeholder": "授權金鑰",
-      "cta": "配對"
-    },
-    "done": {
-      "title": "設定完成",
-      "body": "手環已配對,首次同步將在背景進行。",
-      "cta": "進入儀表板"
     }
   },
   "dashboard": {

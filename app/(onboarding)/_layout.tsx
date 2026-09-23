@@ -1,5 +1,5 @@
 /*
- * mi-band-9-active — onboarding stack layout.
+ * mi-band-9-active — onboarding stack: welcome → connect → key → extras.
  * Copyright (C) 2026 kidneyweakx
  *
  * AGPL-3.0-or-later. See LICENSE, NOTICE.md.
@@ -17,13 +17,10 @@ export default function OnboardingLayout() {
       }}
     >
       <Stack.Screen name="welcome" />
-      <Stack.Screen name="language" />
-      <Stack.Screen name="bluetooth" />
-      <Stack.Screen name="notifications" />
-      <Stack.Screen name="battery" />
-      <Stack.Screen name="scan" />
-      <Stack.Screen name="auth" />
-      <Stack.Screen name="done" />
+      <Stack.Screen name="connect" />
+      <Stack.Screen name="key" />
+      {/* Band is paired by now — no swiping back into the key step. */}
+      <Stack.Screen name="extras" options={{ gestureEnabled: false }} />
     </Stack>
   );
 }

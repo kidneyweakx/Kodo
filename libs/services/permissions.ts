@@ -101,6 +101,17 @@ export const permissions = {
     }
   },
 
+  async hasPostNotifications(): Promise<boolean> {
+    if (!isAndroid) return true;
+    const id = resolvePermission('POST_NOTIFICATIONS');
+    if (!id) return true;
+    try {
+      return await PermissionsAndroid.check(id);
+    } catch {
+      return false;
+    }
+  },
+
   async requestPostNotifications(): Promise<boolean> {
     if (!isAndroid) return true;
     const id = resolvePermission('POST_NOTIFICATIONS');

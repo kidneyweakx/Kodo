@@ -20,49 +20,85 @@
   },
   "onboarding": {
     "welcome": {
-      "title": "Travel light with your Mi Band 9 Active",
-      "body": "A single-device companion. No cloud. No tracking. Long battery life on both ends.",
-      "cta": "Get started"
+      "title": "Your Mi Band 9 Active, without the cloud",
+      "body": "Three quick steps: find the band, paste its key, done. Everything stays on this phone.",
+      "cta": "Start pairing",
+      "points": {
+        "local": "Local first · nothing leaves this phone",
+        "battery": "Battery-aware · no always-on service",
+        "single": "Made only for Mi Band 9 Active"
+      }
     },
-    "language": {
-      "title": "Pick your language",
-      "body": "You can change this later in Settings.",
-      "zhHant": "繁體中文",
-      "en": "English"
+    "connect": {
+      "title": "Find your band",
+      "body": "Wake the band and keep it next to your phone.",
+      "cta": "Allow Bluetooth & search",
+      "rescan": "Search again",
+      "next": "Use this band",
+      "searching": "Searching nearby…",
+      "found": "Found {{count}} band(s)",
+      "bonded": "Known to Android",
+      "signal": {
+        "strong": "Strong signal",
+        "ok": "Good signal",
+        "weak": "Weak signal"
+      },
+      "permissionDenied": "Bluetooth permission is needed to find the band.",
+      "openSettings": "Open app settings",
+      "empty": {
+        "title": "No band found yet",
+        "tips": "• Wake the band screen and hold it close\n• If Mi Fitness is connected to it, force-stop Mi Fitness (don't unpair — that resets the key)\n• Turn on Location services — Android needs it for Bluetooth scans"
+      },
+      "openLocation": "Open location settings"
     },
-    "bluetooth": {
-      "title": "Bluetooth access",
-      "body": "We need Bluetooth and nearby-devices to talk to your band. No location is collected.",
-      "cta": "Allow Bluetooth"
+    "key": {
+      "title": "Paste the auth key",
+      "body": "Xiaomi bands only talk to apps holding their 32-character auth key. It never leaves this phone.",
+      "placeholder": "32 hex characters",
+      "paste": "Paste",
+      "valid": "Key looks good",
+      "count": "{{count}} / 32",
+      "cta": "Pair",
+      "help": "Where do I get the key?",
+      "helpBody": "The key is created when the band is bound in Mi Fitness. Gadgetbridge's guide explains how to read it (e.g. with the Huafetcher tool or from a Mi Fitness log).",
+      "helpLink": "Open the Gadgetbridge guide",
+      "phase": {
+        "connecting": "Connecting to the band…",
+        "authenticating": "Verifying key…",
+        "connected": "Paired!"
+      },
+      "errors": {
+        "AUTH_KEY_INVALID": "That isn't a valid key — it should be 32 hex characters (0-9, a-f).",
+        "AUTH_REJECTED": "The band rejected this key. Re-read it from Mi Fitness — unpairing there creates a new key.",
+        "BT_OFF": "Bluetooth is off. Turn it on and try again.",
+        "PERMISSION": "Bluetooth permission was revoked. Allow it and try again.",
+        "TIMEOUT": "The band didn't answer. Keep it close, force-stop Mi Fitness / Gadgetbridge, then retry.",
+        "GATT": "Bluetooth connection failed. Toggle Bluetooth and retry.",
+        "NOT_PAIRED": "Pick a band first.",
+        "UNKNOWN": "Pairing failed."
+      }
+    },
+    "extras": {
+      "title": "Finishing touches",
+      "body": "Optional — you can change these anytime in Settings.",
+      "notif": {
+        "title": "Forward notifications",
+        "body": "Chat, mail and call alerts on your wrist."
+      },
+      "post": {
+        "title": "App notifications",
+        "body": "Sync status and find-my-phone alerts."
+      },
+      "battery": {
+        "title": "Reliable background sync",
+        "body": "Let Android run the 30-minute sync unrestricted."
+      },
+      "on": "On",
+      "enable": "Enable",
+      "cta": "Open dashboard"
     },
     "notifications": {
-      "title": "Notification access",
-      "body": "Forward chat, mail and calendar alerts to your band. You choose which apps later.",
       "cta": "Open Settings"
-    },
-    "battery": {
-      "title": "Keep us awake",
-      "body": "Whitelist this app from battery optimization so syncs do not stall overnight.",
-      "cta": "Whitelist now"
-    },
-    "scan": {
-      "title": "Find your band",
-      "body": "Wake your Mi Band 9 Active and bring it close. We will only show devices named “Xiaomi Smart Band 9 Active”.",
-      "cta": "Scan",
-      "scanning": "Scanning…",
-      "empty": "Nothing found yet. Make sure the band is unpaired in Xiaomi Wear.",
-      "select": "Pair"
-    },
-    "auth": {
-      "title": "Pair securely",
-      "body": "Paste the 32-byte auth key. We never send it off-device.",
-      "placeholder": "Auth key",
-      "cta": "Pair"
-    },
-    "done": {
-      "title": "All set",
-      "body": "Your band is paired. The first sync runs in the background.",
-      "cta": "Open dashboard"
     }
   },
   "dashboard": {

@@ -13,6 +13,9 @@ import { Redirect } from 'expo-router';
 import { cache, cacheKeys } from '@/libs/services/cache';
 
 export default function Index() {
-  const onboarded = cache.getSync<boolean>(cacheKeys.onboardingDone) === true;
-  return onboarded ? <Redirect href="/(tabs)" /> : <Redirect href="/(onboarding)/welcome" />;
+  if (cache.getSync<boolean>(cacheKeys.onboardingDone) === true) return <Redirect href="/(tabs)" />;
+  // Paired but the app was closed on the last (optional) step — resume there
+  // instead of making the user scan and paste the key again.
+  if (cache.getSync(cacheKeys.pairedBand)) return <Redirect href="/(onboarding)/extras" />;
+  return <Redirect href="/(onboarding)/welcome" />;
 }
