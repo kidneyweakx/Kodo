@@ -5,7 +5,7 @@
       <stop offset="1" stop-color="#2EE0A2"/>
     </linearGradient>
   </defs>
-  <g transform="translate(266,266) scale(5.1667)">
+  <g transform="translate(80,80) scale(9)">
     <path d="M48 10 a30 30 0 0 1 0 60 a30 30 0 0 1 0 -60" fill="none" stroke="url(#stroke)" stroke-width="8" stroke-linecap="round" opacity="0.22"/>
     <path d="M22 32 a30 30 0 0 1 52 0" fill="none" stroke="url(#stroke)" stroke-width="8" stroke-linecap="round"/>
     <path d="M22 64 a30 30 0 0 0 52 0" fill="none" stroke="url(#stroke)" stroke-width="8" stroke-linecap="round"/>
