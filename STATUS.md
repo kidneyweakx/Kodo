@@ -1,6 +1,6 @@
 # STATUS
 
-Updated: 2026-09-24 · upstream reference: Gadgetbridge `75f923904f` (master)
+Updated: 2026-09-28 (v0.3.0) · upstream reference: Gadgetbridge `75f923904f` (master)
 
 Every area below was re-audited line-by-line against the upstream Java and
 fixed where it diverged. **Compiled ≠ verified**: the column on the right is
@@ -36,6 +36,11 @@ Release APKs are built by `.github/workflows/release.yml` on `v*` tags.
 | Calendar | `CalendarService` | subtype 1 (was 0); CalendarContract, 7 days, first-alert reminder | — |
 | GPS workouts | `gps/*` | answer band's open-workout request; stream only while the band's workout runs; `TYPE_LOCATION` FGS | Android 14 background FGS start |
 | Watch faces | `WatchfaceService`, `MiBand9DataUploader` | id from file header; ack subscribed before send; timeout + one upload at a time | real install end-to-end |
+| Sleep nights | `SleepNightAssembler`, `SampleStore.sleepNight(s)` | fragments merged like `SleepAnalysis` (≤1 h gap = awake), naps split out, stages start at bedtime, one Health Connect record per night | stage totals vs band totals; in-progress nights; sleep-quality byte meaning |
+| Backup / restore | `dataport/KodoBackup` | zip of every store table + prefs + app prefs, optional auth-key stripping, merge-only restore | share-sheet FileProvider; restore during a running sync |
+| Gadgetbridge import | `dataport/GadgetbridgeImport` | export zip or raw DB, XIAOMI_* tables in GB units, auth key from `preferences/device_<MAC>.json` | column names on a real GB export; WAL exports; large DBs |
+| Keep-alive & power | `DriverHolder.armReconnect`, `PowerLog`, `MiBand9PeriodicSyncWorker.reconcile` | reconnect re-armed at every process start, instant re-arm after range loss, sticky user disconnect, persisted wake-up log | 12-step checklist in the v0.3.0 agent report: reboot, Doze, standby buckets, BT toggle, 24 h soak |
+| Band system extras | `SystemExtrasService` | device state (worn/charging/asleep), band lock, display items, screen-on for notifications, realtime HR (opt-in, 5 min cap) | lock code round-trip; display item labels |
 
 ## Verified on device
 
