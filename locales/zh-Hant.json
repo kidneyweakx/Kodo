@@ -206,6 +206,10 @@
       "backup": {
         "title": "備份與匯入",
         "body": "完整備份、還原,或匯入 Gadgetbridge 的歷史"
+      },
+      "connection": {
+        "title": "連線與電力",
+        "body": "連線狀態、背景同步、耗電"
       }
     },
     "danger": {
@@ -451,6 +455,42 @@
       "working": "處理中… {{pct}}%",
       "failed": "沒有成功",
       "notKodo": "這不是 Kodō 備份"
+    },
+    "connection": {
+      "link": "手環連線",
+      "bluetooth": "藍牙",
+      "on": "開",
+      "off": "關",
+      "bonded": "系統配對",
+      "state": "狀態",
+      "lastConnected": "上次連線",
+      "lastDisconnected": "上次斷線",
+      "reason": "原因",
+      "reconnect": "自動重連",
+      "reconnectArmed": "等待手環回來(已嘗試 {{n}} 次)",
+      "reconnectIdle": "未啟用",
+      "background": "背景同步",
+      "every": "每 {{min}} 分鐘",
+      "nextRun": "下次執行",
+      "lastSync": "上次同步",
+      "lastError": "上次錯誤",
+      "keepAlive": "保活",
+      "listener": "通知存取",
+      "listenerBody": "開啟時 Android 會讓 Kodō 持續運作 — 連線能保持靠的就是它",
+      "battery": "電池最佳化",
+      "batteryOn": "不受限制",
+      "batteryOff": "受限 — 同步可能延後",
+      "power": "電力",
+      "wakeups": "24 小時內喚醒次數",
+      "wakeupsBody": "目標:少於 50 次",
+      "events": "最近事件",
+      "noEvents": "還沒有事件",
+      "clear": "清除紀錄",
+      "live": "即時心率",
+      "liveBody": "從手環串流最多 5 分鐘,之後自動停止以省電",
+      "liveStart": "開始",
+      "liveStop": "停止",
+      "never": "從未"
     }
   },
   "sleep": {

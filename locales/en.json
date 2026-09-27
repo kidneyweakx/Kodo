@@ -206,6 +206,10 @@
       "backup": {
         "title": "Backup & import",
         "body": "Save everything, restore, or bring your Gadgetbridge history"
+      },
+      "connection": {
+        "title": "Connection & power",
+        "body": "Link health, background sync, battery use"
       }
     },
     "danger": {
@@ -451,6 +455,42 @@
       "working": "Working… {{pct}}%",
       "failed": "That didn't work",
       "notKodo": "This isn't a Kodō backup"
+    },
+    "connection": {
+      "link": "Band link",
+      "bluetooth": "Bluetooth",
+      "on": "On",
+      "off": "Off",
+      "bonded": "Android bond",
+      "state": "State",
+      "lastConnected": "Last connected",
+      "lastDisconnected": "Last dropped",
+      "reason": "Reason",
+      "reconnect": "Auto-reconnect",
+      "reconnectArmed": "Waiting for the band ({{n}} tries)",
+      "reconnectIdle": "Not armed",
+      "background": "Background sync",
+      "every": "Every {{min}} min",
+      "nextRun": "Next run",
+      "lastSync": "Last sync",
+      "lastError": "Last error",
+      "keepAlive": "Keep-alive",
+      "listener": "Notification access",
+      "listenerBody": "Android keeps Kodō running while this is on — it's what lets the link survive",
+      "battery": "Battery optimisation",
+      "batteryOn": "Unrestricted",
+      "batteryOff": "Restricted — sync may be delayed",
+      "power": "Power",
+      "wakeups": "Wake-ups in 24 h",
+      "wakeupsBody": "Target: under 50",
+      "events": "Recent events",
+      "noEvents": "No events yet",
+      "clear": "Clear log",
+      "live": "Live heart rate",
+      "liveBody": "Streams from the band for up to 5 minutes, then stops to save battery",
+      "liveStart": "Start",
+      "liveStop": "Stop",
+      "never": "never"
     }
   },
   "sleep": {
