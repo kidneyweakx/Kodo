@@ -73,3 +73,23 @@ Every wake-up and link transition logs under the `MB9A_POWER` tag through `Power
 - Wake-ups stay under 50 per day.
 - There are no wakelocks attributed to the app outside WorkManager.
 - Bluetooth scan time is only from onboarding.
+
+## On-device keep-alive checklist
+
+Keep `adb logcat -s MB9A_POWER MiBand9BleDriver MB9A_PeriodicSync` running while you go through these.
+
+1. **Cold start:** `adb shell am force-stop com.kidneyweakx.kodo`, then toggle notification access. Do not open the app. Expect `process_start` → `reconnect_armed` → `connected`.
+2. **Reboot:** `adb reboot`, unlock, don't open the app. Expect the same sequence as step 1.
+3. **Range:**
+   - Walk out of range. Expect `disconnected` with status 8, then an immediate `reconnect_armed`.
+   - Come back. Expect `connected`.
+   - Repeat with a band restart.
+4. **Bluetooth toggle:** `adb shell cmd bluetooth_manager disable`, then `… enable`. Expect `bluetooth off` → `bluetooth on — resuming` → `connected`. Repeat with airplane mode.
+5. **Doze:** `adb shell dumpsys deviceidle force-idle`, then send an allow-listed notification and trigger find-phone from the band. Both should arrive. Undo with `adb shell dumpsys deviceidle unforce`.
+6. **Standby buckets:** `adb shell am set-standby-bucket com.kidneyweakx.kodo rare` (then `restricted`), check `adb shell dumpsys jobscheduler | grep -A5 kodo`, and reset with `active`.
+7. **Worker:** force-run it with `adb shell cmd jobscheduler run -f com.kidneyweakx.kodo <jobId>`, once connected and once disconnected. A live link must stay up.
+8. **Disable:** turn background sync off in Settings. `dumpsys jobscheduler` should no longer list the job.
+9. **Overlap:** start a manual sync, then force-run the worker. Expect "sync already running; awaiting it".
+10. **User disconnect:** disconnect, then `am force-stop` and rebind. Nothing should reconnect, and Connection & power shows the disconnect.
+11. **Live heart rate:** leave the screen and expect `realtime_hr stop: last listener unsubscribed`. Separately, let it run and confirm it stops at the 5 min cap.
+12. **24 h soak:** `adb shell dumpsys batterystats --charged com.kidneyweakx.kodo`. Expect fewer than 50 wake-ups, matching the number in Connection & power, and no wakelocks attributed to the app.

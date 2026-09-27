@@ -39,7 +39,7 @@ Release APKs are built by `.github/workflows/release.yml` on `v*` tags.
 | Sleep nights | `SleepNightAssembler`, `SampleStore.sleepNight(s)` | fragments merged like `SleepAnalysis` (≤1 h gap = awake), naps split out, stages start at bedtime, one Health Connect record per night | stage totals vs band totals; in-progress nights; sleep-quality byte meaning |
 | Backup / restore | `dataport/KodoBackup` | zip of every store table + prefs + app prefs, optional auth-key stripping, merge-only restore | share-sheet FileProvider; restore during a running sync |
 | Gadgetbridge import | `dataport/GadgetbridgeImport` | export zip or raw DB, XIAOMI_* tables in GB units, auth key from `preferences/device_<MAC>.json` | column names on a real GB export; WAL exports; large DBs |
-| Keep-alive & power | `DriverHolder.armReconnect`, `PowerLog`, `MiBand9PeriodicSyncWorker.reconcile` | reconnect re-armed at every process start, instant re-arm after range loss, sticky user disconnect, persisted wake-up log | 12-step checklist in the v0.3.0 agent report: reboot, Doze, standby buckets, BT toggle, 24 h soak |
+| Keep-alive & power | `DriverHolder.armReconnect`, `PowerLog`, `MiBand9PeriodicSyncWorker.reconcile` | reconnect re-armed at every process start, instant re-arm after range loss, sticky user disconnect, persisted wake-up log | the 12-step checklist in `docs/POWER.md` (reboot, Doze, standby buckets, BT toggle, 24 h soak) |
 | Band system extras | `SystemExtrasService` | device state (worn/charging/asleep), band lock, display items, screen-on for notifications, realtime HR (opt-in, 5 min cap) | lock code round-trip; display item labels |
 
 ## Verified on device
