@@ -12,6 +12,11 @@
  *      notification, goals, vitality score)
  *   - nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.XiaomiCoordinator (feature gating)
  *
+ * Also ported (XiaomiSystemService / XiaomiNotificationService): live device
+ * state (worn / asleep / charging, 2/78 + 2/79), band lock password (2/9 +
+ * 2/21), display items (2/29 + 2/30) and "screen on for notifications"
+ * (7/6 + 7/7). Each is gated by the band's own answer (BandFeatures).
+ *
  * Mi Band 9 Active does NOT support `findDevice` (phone -> band ring) nor
  * manual heart-rate measurement (MiBand9ActiveCoordinator). Wrist-raise and
  * band DND are not implemented upstream for Xiaomi protobuf devices, so they
@@ -94,6 +99,54 @@ export interface BandFeatures {
   readonly findBand: boolean;
   /** Always false on Mi Band 9 Active (MiBand9ActiveCoordinator). */
   readonly manualHeartRate: boolean;
+  /** XiaomiCoordinator.supportsRealtimeData() — always true; see HybridBandLink.startRealtimeHeartRate. */
+  readonly realtimeHeartRate: boolean;
+  /** Band answered the device-state GET (FEAT_DEVICE_ACTIONS): worn / asleep / charging available. */
+  readonly deviceState: boolean;
+  /** Band answered the password GET (FEAT_PASSWORD). */
+  readonly password: boolean;
+  /** Band reported a non-empty display-item list (FEAT_DISPLAY_ITEMS). */
+  readonly displayItems: boolean;
+  /** Band answered the screen-on-for-notifications GET (FEAT_SCREEN_ON_ON_NOTIFICATIONS). */
+  readonly screenOnOnNotifications: boolean;
+}
+
+/**
+ * Live band state (XiaomiSystemService.handleBasicDeviceState / handleDeviceState).
+ * Not persisted: cleared on disconnect, so `undefined` = not connected / not reported.
+ */
+export interface BandDeviceState {
+  readonly charging?: boolean;
+  readonly worn?: boolean;
+  readonly asleep?: boolean;
+  /** Epoch ms of the last band report. */
+  readonly updatedAt: number;
+}
+
+/** Band lock (PasswordCapabilityImpl.Mode.NUMBERS_6). The digits never leave native. */
+export interface BandPasswordState {
+  readonly enabled: boolean;
+  /** A 6-digit password is known (from the band or set here). */
+  readonly hasPassword: boolean;
+}
+
+export interface BandDisplayItem {
+  /** Band screen code, e.g. 'heart_rate'. */
+  readonly code: string;
+  /** Band-provided label (band language). */
+  readonly name: string;
+  readonly enabled: boolean;
+  /** Enabled and shown in the band's "More" section. */
+  readonly inMoreSection: boolean;
+  /** The band's settings screen: always kept enabled. */
+  readonly isSettings: boolean;
+}
+
+export interface BandDisplayItems {
+  /** Enabled items in band order (main, then More), then disabled ones. */
+  readonly items: readonly BandDisplayItem[];
+  /** Epoch ms when stored (band answer or local change). */
+  readonly fetchedAt: number;
 }
 
 export type VibrationCategory =
@@ -169,6 +222,38 @@ export interface HybridSystemControl extends HybridObject<{ android: 'kotlin' }>
   // ---- vibration patterns (read-only) --------------------------------------
   getVibrationPatterns(): VibrationPatternsInfo | undefined;
   refreshVibrationPatterns(): Promise<VibrationPatternsInfo | undefined>;
+
+  // ---- live device state ---------------------------------------------------
+  getDeviceState(): BandDeviceState | undefined;
+  /** Fires on every change of worn / asleep / charging while connected. */
+  onDeviceStateChange(listener: (state: BandDeviceState) => void): () => void;
+
+  // ---- band lock password (FEAT_PASSWORD) ----------------------------------
+  /** Persisted; undefined until the band answered or the user set one. */
+  getPassword(): BandPasswordState | undefined;
+  refreshPassword(): Promise<BandPasswordState | undefined>;
+  /**
+   * Persists + pushes now, or on the next connect. `password` must be exactly
+   * 6 digits; omit it to keep the stored one (e.g. to disable the lock).
+   * Rejects when no valid password is known.
+   */
+  setPassword(enabled: boolean, password?: string): Promise<BandPasswordState>;
+
+  // ---- display items (FEAT_DISPLAY_ITEMS) ----------------------------------
+  getDisplayItems(): BandDisplayItems | undefined;
+  refreshDisplayItems(): Promise<BandDisplayItems | undefined>;
+  /**
+   * Enabled item codes in display order; codes after the marker 'more' go to
+   * the "More" section; unknown codes are ignored; the settings item is always
+   * kept. Pushes now or on the next connect. Rejects if the list was never
+   * received from the band.
+   */
+  setDisplayItems(enabledCodes: readonly string[]): Promise<BandDisplayItems>;
+
+  // ---- screen on for notifications (FEAT_SCREEN_ON_ON_NOTIFICATIONS) -------
+  getScreenOnOnNotifications(): boolean | undefined;
+  refreshScreenOnOnNotifications(): Promise<boolean | undefined>;
+  setScreenOnOnNotifications(enabled: boolean): Promise<boolean>;
 
   // ---- phone status (onboarding / settings) --------------------------------
   /** PowerManager.isIgnoringBatteryOptimizations(packageName). */

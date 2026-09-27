@@ -23,6 +23,11 @@
 import { NativeCameraRemote, NativeGpsTracker, NativeSedentary, NativeSystemControl } from '@/modules/native';
 import { safeAsync, safeCall, safeUnsubscribe } from '@/modules/native/safe';
 import type {
+  BandDeviceState,
+  BandDisplayItems,
+  BandPasswordState,
+} from '@/modules/native/system/system.nitro';
+import type {
   BandDeviceInfo,
   BandFeatures,
   BandSystemSettings,
@@ -32,6 +37,8 @@ import type {
   UserProfile,
   VibrationPatternsInfo,
 } from '@/modules/native';
+
+export type { BandDeviceState, BandDisplayItem, BandDisplayItems, BandPasswordState } from '@/modules/native/system/system.nitro';
 
 export const system = {
   // ---- phone status
@@ -101,6 +108,48 @@ export const system = {
   },
   setUserProfile(profile: UserProfile): Promise<UserProfile> {
     return NativeSystemControl().setUserProfile(profile);
+  },
+
+  // ---- live device state (worn / asleep / charging; undefined when disconnected)
+  getDeviceState(): BandDeviceState | undefined {
+    return safeCall(() => NativeSystemControl().getDeviceState(), undefined);
+  },
+  onDeviceStateChange(listener: (state: BandDeviceState) => void): () => void {
+    return safeUnsubscribe(() => NativeSystemControl().onDeviceStateChange(listener));
+  },
+
+  // ---- band lock password (6 digits; the digits never come back to JS)
+  getPassword(): BandPasswordState | undefined {
+    return safeCall(() => NativeSystemControl().getPassword(), undefined);
+  },
+  refreshPassword(): Promise<BandPasswordState | undefined> {
+    return safeAsync(() => NativeSystemControl().refreshPassword(), undefined);
+  },
+  setPassword(enabled: boolean, password?: string): Promise<BandPasswordState> {
+    return NativeSystemControl().setPassword(enabled, password);
+  },
+
+  // ---- display items (band menu order)
+  getDisplayItems(): BandDisplayItems | undefined {
+    return safeCall(() => NativeSystemControl().getDisplayItems(), undefined);
+  },
+  refreshDisplayItems(): Promise<BandDisplayItems | undefined> {
+    return safeAsync(() => NativeSystemControl().refreshDisplayItems(), undefined);
+  },
+  /** Codes in order; codes after 'more' go to the band's More section. */
+  setDisplayItems(enabledCodes: readonly string[]): Promise<BandDisplayItems> {
+    return NativeSystemControl().setDisplayItems(enabledCodes);
+  },
+
+  // ---- screen on for notifications
+  getScreenOnOnNotifications(): boolean | undefined {
+    return safeCall(() => NativeSystemControl().getScreenOnOnNotifications(), undefined);
+  },
+  refreshScreenOnOnNotifications(): Promise<boolean | undefined> {
+    return safeAsync(() => NativeSystemControl().refreshScreenOnOnNotifications(), undefined);
+  },
+  setScreenOnOnNotifications(enabled: boolean): Promise<boolean> {
+    return NativeSystemControl().setScreenOnOnNotifications(enabled);
   },
 
   // ---- vibration (read-only)

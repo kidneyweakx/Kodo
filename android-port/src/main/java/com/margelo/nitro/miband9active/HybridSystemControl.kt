@@ -14,6 +14,7 @@ import com.kidneyweakx.miband9active.PhoneRinger
 import com.kidneyweakx.miband9active.xiaomi.services.DeviceFeatures
 import com.kidneyweakx.miband9active.xiaomi.services.FeatureStore
 import com.kidneyweakx.miband9active.xiaomi.services.HealthSettingsService
+import com.kidneyweakx.miband9active.xiaomi.services.SystemExtrasService
 import com.kidneyweakx.miband9active.xiaomi.services.SystemService
 import com.margelo.nitro.core.Promise
 import java.time.Instant
@@ -93,7 +94,73 @@ class HybridSystemControl : HybridHybridSystemControlSpec() {
             reminderSlots = FeatureStore.int(FeatureStore.PREF_REMINDER_SLOTS).toDouble(),
             findBand = false, // MiBand9ActiveCoordinator.supportsFindDevice = false
             manualHeartRate = false, // MiBand9ActiveCoordinator.supportsManualHeartRateMeasurement = false
+            realtimeHeartRate = true, // XiaomiCoordinator.supportsRealtimeData = true
+            deviceState = FeatureStore.feature(SystemExtrasService.FEAT_DEVICE_ACTIONS),
+            password = FeatureStore.feature(SystemExtrasService.FEAT_PASSWORD),
+            displayItems = FeatureStore.feature(SystemExtrasService.FEAT_DISPLAY_ITEMS),
+            screenOnOnNotifications = FeatureStore.feature(SystemExtrasService.FEAT_SCREEN_ON_ON_NOTIFICATIONS),
         )
+    }
+
+    // ---- live device state --------------------------------------------------
+
+    override fun getDeviceState(): BandDeviceState? = SystemExtrasService.deviceState?.toNitro()
+
+    override fun onDeviceStateChange(listener: (state: BandDeviceState) -> Unit): () -> Unit =
+        SystemExtrasService.addDeviceStateListener { listener(it.toNitro()) }
+
+    private fun SystemExtrasService.DeviceState.toNitro() =
+        BandDeviceState(charging = charging, worn = worn, asleep = asleep, updatedAt = updatedAt.toDouble())
+
+    // ---- password -------------------------------------------------------------
+
+    override fun getPassword(): BandPasswordState? = SystemExtrasService.getPassword()?.toNitro()
+
+    override fun refreshPassword(): Promise<BandPasswordState?> = Promise.async {
+        SystemExtrasService.refreshPassword()?.toNitro()
+    }
+
+    override fun setPassword(enabled: Boolean, password: String?): Promise<BandPasswordState> = Promise.async {
+        SystemExtrasService.setPassword(enabled, password?.trim()?.takeIf { it.isNotEmpty() }).toNitro()
+    }
+
+    private fun SystemExtrasService.PasswordState.toNitro() = BandPasswordState(enabled = enabled, hasPassword = hasPassword)
+
+    // ---- display items ---------------------------------------------------------
+
+    override fun getDisplayItems(): BandDisplayItems? = SystemExtrasService.getDisplayItems()?.toNitro()
+
+    override fun refreshDisplayItems(): Promise<BandDisplayItems?> = Promise.async {
+        SystemExtrasService.refreshDisplayItems()?.toNitro()
+    }
+
+    override fun setDisplayItems(enabledCodes: Array<String>): Promise<BandDisplayItems> = Promise.async {
+        SystemExtrasService.setDisplayItems(enabledCodes.toList()).toNitro()
+    }
+
+    private fun SystemExtrasService.DisplayItems.toNitro() = BandDisplayItems(
+        items = items.map {
+            BandDisplayItem(
+                code = it.code,
+                name = it.name,
+                enabled = it.enabled,
+                inMoreSection = it.inMoreSection,
+                isSettings = it.isSettings,
+            )
+        }.toTypedArray(),
+        fetchedAt = fetchedAt.toDouble(),
+    )
+
+    // ---- screen on for notifications ---------------------------------------------
+
+    override fun getScreenOnOnNotifications(): Boolean? = SystemExtrasService.getScreenOnOnNotifications()
+
+    override fun refreshScreenOnOnNotifications(): Promise<Boolean?> = Promise.async {
+        SystemExtrasService.refreshScreenOnOnNotifications()
+    }
+
+    override fun setScreenOnOnNotifications(enabled: Boolean): Promise<Boolean> = Promise.async {
+        SystemExtrasService.setScreenOnOnNotifications(enabled)
     }
 
     // ---- health monitoring --------------------------------------------------

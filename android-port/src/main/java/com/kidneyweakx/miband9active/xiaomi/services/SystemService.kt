@@ -265,6 +265,7 @@ object SystemService {
 
     /** XiaomiSystemService.handleCommand() subset. Must not block: runs on the incoming collector. */
     fun handleCommand(cmd: XiaomiProto.Command) {
+        if (SystemExtrasService.handleSystemCommand(cmd)) return // device state, password, display items
         when (cmd.subtype) {
             SystemCommands.CMD_DEVICE_INFO ->
                 if (cmd.hasSystem() && cmd.system.hasDeviceInfo()) storeDeviceInfo(cmd.system.deviceInfo)
