@@ -22,7 +22,8 @@
     "HybridWeatherProvider": { "android": { "language": "kotlin", "implementationClassName": "HybridWeatherProvider" } },
     "HybridHealthConnect": { "android": { "language": "kotlin", "implementationClassName": "HybridHealthConnect" } },
     "HybridWatchface": { "android": { "language": "kotlin", "implementationClassName": "HybridWatchface" } },
-    "HybridSchedule": { "android": { "language": "kotlin", "implementationClassName": "HybridSchedule" } }
+    "HybridSchedule": { "android": { "language": "kotlin", "implementationClassName": "HybridSchedule" } },
+    "HybridDataPort": { "android": { "language": "kotlin", "implementationClassName": "HybridDataPort" } }
   },
   "ignorePaths": ["node_modules", "vendor"]
 }

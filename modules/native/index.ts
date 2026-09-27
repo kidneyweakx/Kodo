@@ -15,6 +15,7 @@ import type { HybridObject } from 'react-native-nitro-modules';
 import type { HybridBandLink } from '@/modules/native/bandLink/bandLink.nitro';
 import type { HybridCalendarBridge } from '@/modules/native/calendar/calendar.nitro';
 import type { HybridCameraRemote } from '@/modules/native/cameraRemote/cameraRemote.nitro';
+import type { HybridDataPort } from '@/modules/native/dataPort/dataPort.nitro';
 import type { HybridGpsTracker } from '@/modules/native/gps/gps.nitro';
 import type { HybridHealthConnect } from '@/modules/native/healthConnect/healthConnect.nitro';
 import type { HybridHealthStore } from '@/modules/native/health/health.nitro';
@@ -52,11 +53,13 @@ export const NativeWeatherProvider = lazyHybrid<HybridWeatherProvider>('HybridWe
 export const NativeHealthConnect = lazyHybrid<HybridHealthConnect>('HybridHealthConnect');
 export const NativeWatchface = lazyHybrid<HybridWatchface>('HybridWatchface');
 export const NativeSchedule = lazyHybrid<HybridSchedule>('HybridSchedule');
+export const NativeDataPort = lazyHybrid<HybridDataPort>('HybridDataPort');
 
 export type {
   HybridBandLink,
   HybridCalendarBridge,
   HybridCameraRemote,
+  HybridDataPort,
   HybridGpsTracker,
   HybridHealthConnect,
   HybridHealthStore,
@@ -69,6 +72,14 @@ export type {
   HybridWeatherBridge,
   HybridWeatherProvider,
 };
+export type {
+  BackupFormat,
+  BackupInfo,
+  BackupSummary,
+  GadgetbridgeDevice,
+  ImportSummary,
+  RestoreResult,
+} from '@/modules/native/dataPort/dataPort.nitro';
 export type { WatchfaceFileInfo, WatchfaceInfo } from '@/modules/native/watchface/watchface.nitro';
 
 export * from '@/modules/native/types';
