@@ -420,5 +420,47 @@
       "delete": "刪除提醒",
       "full": "提醒數量已達上限"
     }
+  },
+  "sleep": {
+    "title": "睡眠",
+    "lastNight": "昨晚",
+    "hm": "{{h}} 小時 {{m}} 分",
+    "m": "{{m}} 分",
+    "bedWake": "{{bed}} → {{wake}}",
+    "score": "睡眠分數",
+    "stages": {
+      "awake": "清醒",
+      "rem": "快速動眼",
+      "light": "淺眠",
+      "deep": "深眠"
+    },
+    "stagesTitle": "睡眠階段",
+    "hypnogram": "整晚的睡眠階段",
+    "vitals": "睡眠期間",
+    "avgHr": "平均心率",
+    "lowHr": "最低心率",
+    "avgSpo2": "平均血氧",
+    "lowSpo2": "最低血氧",
+    "awakeCount": "醒來次數",
+    "naps": "小睡",
+    "trend": "最近 7 晚",
+    "avg": "平均 {{value}}",
+    "emptyTitle": "沒有睡眠紀錄",
+    "emptyBody": "戴著手環睡覺,早上同步一次。手環傳送當晚的檔案後,睡眠就會顯示在這裡。",
+    "summaryOnly": "手環只傳了這晚的總計,沒有階段時間軸。",
+    "sync": "立即同步",
+    "schedule": "就寢排程",
+    "scheduleBody": "手環的睡眠模式",
+    "prev": "前一晚",
+    "next": "後一晚",
+    "today": "今天",
+    "tapHint": "點圖表可查看各階段",
+    "perNight": "每晚"
+  },
+  "tabs": {
+    "today": "今日",
+    "sleep": "睡眠",
+    "notifications": "通知",
+    "settings": "設定"
   }
 }

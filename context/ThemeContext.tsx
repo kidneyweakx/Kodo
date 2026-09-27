@@ -276,3 +276,19 @@ export const themeSwatch = (id: ThemeId, mode: 'light' | 'dark'): { readonly acc
   const palette = THEMES[id][mode];
   return { accent: palette.accent, background: palette.background.tertiary };
 };
+
+export type SleepStageKey = 'awake' | 'rem' | 'light' | 'deep';
+
+/**
+ * Sleep-stage colours (dataviz reference slots, validated with the dataviz
+ * palette checker in hypnogram lane order awake → REM → light → deep: adjacent
+ * CVD ΔE ≥ 17, normal-vision ΔE ≥ 20 in both modes). Stage identity is also
+ * carried by lane position + text labels, so colour is never the only cue.
+ * Theme-independent on purpose: a stage must look the same in every theme.
+ */
+const SLEEP_STAGE_COLORS: Record<'light' | 'dark', Record<SleepStageKey, string>> = {
+  light: { awake: '#eb6834', rem: '#2a78d6', light: '#1baf7a', deep: '#4a3aa7' },
+  dark: { awake: '#d95926', rem: '#3987e5', light: '#199e70', deep: '#9085e9' },
+};
+
+export const sleepStageColors = (mode: 'light' | 'dark'): Record<SleepStageKey, string> => SLEEP_STAGE_COLORS[mode];

@@ -16,6 +16,7 @@
  * Empty/cold = '—' + "尚未同步", never a faked number (rule 8).
  */
 
+import { router } from 'expo-router';
 import { useMemo } from 'react';
 import { ScrollView, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -32,7 +33,7 @@ import { RecentWorkoutsCard } from '@/components/dashboard/RecentWorkoutsCard';
 import { StickyActionDock } from '@/components/dashboard/StickyActionDock';
 import { SyncStatusBar } from '@/components/dashboard/SyncStatusBar';
 import { bandLink, useBatteryInfo, useConnectionState, usePairedBand } from '@/libs/services/bandLink';
-import { useDashboardSummary, useRecentWorkouts } from '@/libs/services/healthStore';
+import { useDashboardSummary, useRecentWorkouts, useSleepNight } from '@/libs/services/healthStore';
 import { useSyncStatus } from '@/libs/services/syncStatus';
 import { t } from '@/libs/services/i18n';
 import { cache, cacheKeys } from '@/libs/services/cache';
@@ -65,6 +66,7 @@ export default function TodayScreen() {
   const battery = useBatteryInfo();
   const connectionState = useConnectionState();
   const dashboard = useDashboardSummary();
+  const lastNight = useSleepNight();
   const workouts = useRecentWorkouts(10);
   const syncStatus = useSyncStatus();
   const lastSync = cache.getSync<string>(cacheKeys.lastSyncAt);
@@ -88,6 +90,7 @@ export default function TodayScreen() {
 
   const bentos = useMemo(() => {
     const s = dashboard.summary;
+    const sleepMinutes = lastNight?.totalMinutes ?? s?.sleepMinutes ?? null;
     const state: 'ready' | 'loading' | 'unsynced' = s
       ? 'ready'
       : dashboard.state === 'cold'
@@ -110,9 +113,10 @@ export default function TodayScreen() {
       },
       {
         label: 'Sleep · 睡眠',
+        // The assembled night (stages merged, naps excluded) beats the daily-summary figure.
         value:
-          s?.sleepMinutes != null
-            ? `${Math.floor(s.sleepMinutes / 60)}h${String(s.sleepMinutes % 60).padStart(2, '0')}`
+          sleepMinutes != null
+            ? `${Math.floor(sleepMinutes / 60)}h${String(Math.round(sleepMinutes % 60)).padStart(2, '0')}`
             : null,
         hint: 'Last night · 昨夜',
         tone: 'success',
@@ -140,7 +144,7 @@ export default function TodayScreen() {
       tone: 'success',
     };
     return { state, cards, pai };
-  }, [dashboard]);
+  }, [dashboard, lastNight]);
 
   const onSync = async () => {
     try {
@@ -263,7 +267,7 @@ export default function TodayScreen() {
         <View style={{ gap: Spacing.md }}>
           <View style={{ flexDirection: 'row', gap: Spacing.md }}>
             <MetricBento {...bentos.cards[0]} state={bentos.state} delay={60} />
-            <MetricBento {...bentos.cards[1]} state={bentos.state} delay={120} />
+            <MetricBento {...bentos.cards[1]} state={bentos.state} delay={120} onPress={() => router.navigate('/(tabs)/sleep')} />
           </View>
           <View style={{ flexDirection: 'row', gap: Spacing.md }}>
             <MetricBento {...bentos.cards[2]} state={bentos.state} delay={180} />

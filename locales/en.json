@@ -420,5 +420,47 @@
       "delete": "Delete reminder",
       "full": "All reminder slots are used"
     }
+  },
+  "sleep": {
+    "title": "Sleep",
+    "lastNight": "Last night",
+    "hm": "{{h}}h {{m}}m",
+    "m": "{{m}}m",
+    "bedWake": "{{bed}} → {{wake}}",
+    "score": "Sleep score",
+    "stages": {
+      "awake": "Awake",
+      "rem": "REM",
+      "light": "Light",
+      "deep": "Deep"
+    },
+    "stagesTitle": "Stages",
+    "hypnogram": "Sleep stages over the night",
+    "vitals": "While you slept",
+    "avgHr": "Avg heart rate",
+    "lowHr": "Lowest heart rate",
+    "avgSpo2": "Avg SpO₂",
+    "lowSpo2": "Lowest SpO₂",
+    "awakeCount": "Times awake",
+    "naps": "Naps",
+    "trend": "Last 7 nights",
+    "avg": "Avg {{value}}",
+    "emptyTitle": "No sleep recorded",
+    "emptyBody": "Wear the band to bed, then sync in the morning. Sleep shows up once the band has sent the night's files.",
+    "summaryOnly": "The band sent totals for this night but no stage timeline.",
+    "sync": "Sync now",
+    "schedule": "Sleep schedule",
+    "scheduleBody": "Bedtime mode on the band",
+    "prev": "Previous night",
+    "next": "Next night",
+    "today": "Today",
+    "tapHint": "Tap the chart to inspect a stage",
+    "perNight": "per night"
+  },
+  "tabs": {
+    "today": "Today",
+    "sleep": "Sleep",
+    "notifications": "Alerts",
+    "settings": "Settings"
   }
 }

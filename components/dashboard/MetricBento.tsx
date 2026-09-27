@@ -9,7 +9,7 @@
  * full-width hero variant is still in MetricCard.tsx.
  */
 
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 
@@ -28,15 +28,22 @@ export interface MetricBentoProps {
   readonly tone?: MetricTone;
   readonly state: MetricState;
   readonly delay?: number;
+  /** Optional drill-down (e.g. sleep bento → Sleep tab). */
+  readonly onPress?: () => void;
 }
 
 const toneColor = (theme: ReturnType<typeof useTheme>['theme'], tone: MetricTone) => {
   switch (tone) {
-    case 'success': return theme.success;
-    case 'warning': return theme.warning;
-    case 'danger': return theme.danger;
-    case 'accent': return theme.accent;
-    default: return theme.text.secondary;
+    case 'success':
+      return theme.success;
+    case 'warning':
+      return theme.warning;
+    case 'danger':
+      return theme.danger;
+    case 'accent':
+      return theme.accent;
+    default:
+      return theme.text.secondary;
   }
 };
 
@@ -48,66 +55,76 @@ export function MetricBento({
   tone = 'neutral',
   state,
   delay = 0,
+  onPress,
 }: MetricBentoProps) {
   const { theme } = useTheme();
   const accent = toneColor(theme, tone);
 
   return (
-    <Animated.View entering={FadeInUp.delay(delay).duration(360).springify().damping(20)} style={{ flex: 1 }}>
-      <ThemedSurface variant="elevated" padded={false} radius="lg" style={{ overflow: 'hidden' }}>
-        {/* Soft tone wash — keeps the card alive even when value is empty. */}
-        <LinearGradient
-          pointerEvents="none"
-          colors={[`${accent}22`, 'transparent']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-        />
-        <View style={{ padding: Spacing.lg, gap: Spacing.sm }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <View
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: accent,
-              }}
-            />
-            <ThemedText variant="eyebrow" tone="tertiary">
-              {label.toUpperCase()}
-            </ThemedText>
-          </View>
-
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-            <ThemedText
-              style={{
-                ...Typography.displayMedium,
-                ...tabularNums,
-                color: state === 'ready' ? theme.text.primary : theme.text.tertiary,
-              }}
-            >
-              {state === 'ready' ? (value ?? '—') : state === 'loading' ? '…' : '—'}
-            </ThemedText>
-            {unit && state === 'ready' ? (
-              <ThemedText variant="titleMedium" tone="secondary">
-                {unit}
+    <Animated.View
+      entering={FadeInUp.delay(delay).duration(360).springify().damping(20)}
+      style={{ flex: 1 }}
+    >
+      <Pressable
+        onPress={onPress}
+        disabled={!onPress}
+        accessibilityRole={onPress ? 'button' : undefined}
+      >
+        <ThemedSurface variant="elevated" padded={false} radius="lg" style={{ overflow: 'hidden' }}>
+          {/* Soft tone wash — keeps the card alive even when value is empty. */}
+          <LinearGradient
+            pointerEvents="none"
+            colors={[`${accent}22`, 'transparent']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          />
+          <View style={{ padding: Spacing.lg, gap: Spacing.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: accent,
+                }}
+              />
+              <ThemedText variant="eyebrow" tone="tertiary">
+                {label.toUpperCase()}
               </ThemedText>
-            ) : null}
-          </View>
+            </View>
 
-          {hint ? (
-            <ThemedText variant="caption" tone="secondary">
-              {hint}
-            </ThemedText>
-          ) : state !== 'ready' ? (
-            <ThemedText variant="caption" tone="tertiary">
-              尚未同步
-            </ThemedText>
-          ) : (
-            <View style={{ height: Spacing.md }} />
-          )}
-        </View>
-      </ThemedSurface>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+              <ThemedText
+                style={{
+                  ...Typography.displayMedium,
+                  ...tabularNums,
+                  color: state === 'ready' ? theme.text.primary : theme.text.tertiary,
+                }}
+              >
+                {state === 'ready' ? (value ?? '—') : state === 'loading' ? '…' : '—'}
+              </ThemedText>
+              {unit && state === 'ready' ? (
+                <ThemedText variant="titleMedium" tone="secondary">
+                  {unit}
+                </ThemedText>
+              ) : null}
+            </View>
+
+            {hint ? (
+              <ThemedText variant="caption" tone="secondary">
+                {hint}
+              </ThemedText>
+            ) : state !== 'ready' ? (
+              <ThemedText variant="caption" tone="tertiary">
+                尚未同步
+              </ThemedText>
+            ) : (
+              <View style={{ height: Spacing.md }} />
+            )}
+          </View>
+        </ThemedSurface>
+      </Pressable>
     </Animated.View>
   );
 }

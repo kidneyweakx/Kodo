@@ -13,7 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Spacing } from '@/constants/DesignSystem';
 import { useTheme } from '@/context/ThemeContext';
 import { ThemedText } from '@/components/themed';
-import { NotificationsIcon, SettingsIcon, TodayIcon } from '@/components/brand/TabIcons';
+import { NotificationsIcon, SettingsIcon, SleepIcon, TodayIcon } from '@/components/brand/TabIcons';
+import { t } from '@/libs/services/i18n';
 
 function TabBarLabel({ label, focused }: { readonly label: string; readonly focused: boolean }) {
   return (
@@ -67,7 +68,15 @@ export default function TabsLayout() {
         options={{
           title: 'Today',
           tabBarIcon: ({ focused, color }) => <TodayIcon focused={focused} color={typeof color === 'string' ? color : undefined} size={24} />,
-          tabBarLabel: ({ focused }) => <TabBarLabel label="Today / 今日" focused={focused} />,
+          tabBarLabel: ({ focused }) => <TabBarLabel label={t('tabs.today')} focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="sleep"
+        options={{
+          title: 'Sleep',
+          tabBarIcon: ({ focused, color }) => <SleepIcon focused={focused} color={typeof color === 'string' ? color : undefined} size={24} />,
+          tabBarLabel: ({ focused }) => <TabBarLabel label={t('tabs.sleep')} focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -75,7 +84,7 @@ export default function TabsLayout() {
         options={{
           title: 'Notifications',
           tabBarIcon: ({ focused, color }) => <NotificationsIcon focused={focused} color={typeof color === 'string' ? color : undefined} size={24} />,
-          tabBarLabel: ({ focused }) => <TabBarLabel label="通知 / Notif" focused={focused} />,
+          tabBarLabel: ({ focused }) => <TabBarLabel label={t('tabs.notifications')} focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -83,7 +92,7 @@ export default function TabsLayout() {
         options={{
           title: 'Settings',
           tabBarIcon: ({ focused, color }) => <SettingsIcon focused={focused} color={typeof color === 'string' ? color : undefined} size={24} />,
-          tabBarLabel: ({ focused }) => <TabBarLabel label="設定 / Settings" focused={focused} />,
+          tabBarLabel: ({ focused }) => <TabBarLabel label={t('tabs.settings')} focused={focused} />,
         }}
       />
     </Tabs>

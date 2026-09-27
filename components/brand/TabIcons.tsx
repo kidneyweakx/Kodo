@@ -73,3 +73,20 @@ export function SettingsIcon({ size = 24, color = '#FFFFFF', focused = false }: 
     </Svg>
   );
 }
+
+export function SleepIcon({ size = 24, color = '#FFFFFF', focused = false }: TabIconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"
+        stroke={color}
+        strokeWidth={STROKE}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill={focused ? color : 'none'}
+        fillOpacity={focused ? 0.18 : 0}
+      />
+      <Path d="M15 4.5h3l-3 3.5h3" stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
