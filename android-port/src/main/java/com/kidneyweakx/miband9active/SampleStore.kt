@@ -152,6 +152,17 @@ object SampleStore {
 
     private val db: SQLiteDatabase by lazy { Helper(AppContext.context).writableDatabase }
 
+    /**
+     * Raw access for the backup / import layer (dataport/*): runs [block] in
+     * one transaction on the store's own connection so dumps and restores are
+     * atomic and never race a sync. Everything else should use the typed
+     * upsert/read functions below.
+     */
+    internal fun <T> withDatabase(block: SQLiteDatabase.() -> T): T = tx(block)
+
+    /** Schema version of the store, recorded in backups. */
+    internal val schemaVersion: Int get() = DB_VERSION
+
     private inline fun <T> tx(block: SQLiteDatabase.() -> T): T {
         db.beginTransaction()
         try {
