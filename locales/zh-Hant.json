@@ -27,7 +27,8 @@
         "local": "本機儲存 · 資料不離開手機",
         "battery": "省電設計 · 不常駐背景",
         "single": "專為 Mi Band 9 Active 打造"
-      }
+      },
+      "restore": "從備份還原,或匯入 Gadgetbridge"
     },
     "connect": {
       "title": "尋找你的手環",
@@ -201,6 +202,10 @@
       "sleepSchedule": {
         "title": "就寢模式",
         "body": "手環的安靜時段"
+      },
+      "backup": {
+        "title": "備份與匯入",
+        "body": "完整備份、還原,或匯入 Gadgetbridge 的歷史"
       }
     },
     "danger": {
@@ -419,6 +424,33 @@
       },
       "delete": "刪除提醒",
       "full": "提醒數量已達上限"
+    },
+    "backup": {
+      "create": "立即備份",
+      "createBody": "把樣本、手環設定與 App 偏好打包成一個 .zip,可存到任何地方。",
+      "includeKey": "包含授權金鑰",
+      "includeKeyOn": "還原時會自動配對 — 請妥善保管這個檔案",
+      "includeKeyOff": "還原後需要重新輸入金鑰",
+      "sharing": "正在準備備份…",
+      "done": "備份完成({{size}})",
+      "restore": "還原 Kodō 備份",
+      "restoreBody": "覆蓋相同的資料,其他資料不會被刪除。",
+      "confirmRestore": "要還原這份備份嗎?",
+      "confirmBody": "{{date}} 的 {{rows}} 筆資料{{band}}",
+      "restored": "已還原 {{rows}} 筆資料",
+      "gb": "從 Gadgetbridge 匯入",
+      "gbBody": "在 Gadgetbridge 開啟「設定 → 資料管理 → 匯出 zip」(或匯出資料庫),再在這裡選擇檔案。心率、步數、血氧、壓力、睡眠與運動都會匯入。",
+      "gbPick": "選擇匯出檔",
+      "gbDevices": "檔案中的裝置",
+      "gbNone": "這個檔案裡沒有小米手環",
+      "gbImport": "匯入歷史資料",
+      "gbImported": "已匯入 {{days}} 天:{{samples}} 筆樣本、{{nights}} 晚睡眠、{{workouts}} 次運動",
+      "gbPair": "用這支手環的金鑰配對",
+      "gbKeyFound": "找到授權金鑰",
+      "gbRange": "{{from}} – {{to}} · {{count}} 筆",
+      "working": "處理中… {{pct}}%",
+      "failed": "沒有成功",
+      "notKodo": "這不是 Kodō 備份"
     }
   },
   "sleep": {

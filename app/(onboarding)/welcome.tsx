@@ -45,12 +45,20 @@ export default function WelcomeScreen() {
       title={t('onboarding.welcome.title')}
       body={t('onboarding.welcome.body')}
       footer={
-        <ThemedButton
-          label={t('onboarding.welcome.cta')}
-          size="lg"
-          fullWidth
-          onPress={() => router.push('/(onboarding)/connect')}
-        />
+        <>
+          <ThemedButton
+            label={t('onboarding.welcome.cta')}
+            size="lg"
+            fullWidth
+            onPress={() => router.push('/(onboarding)/connect')}
+          />
+          <ThemedButton
+            variant="ghost"
+            label={t('onboarding.welcome.restore')}
+            fullWidth
+            onPress={() => router.push('/(settings)/backup')}
+          />
+        </>
       }
     >
       <Animated.View

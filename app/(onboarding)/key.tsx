@@ -33,11 +33,12 @@ const hexDigits = (raw: string): number =>
 
 export default function KeyScreen() {
   const { theme } = useTheme();
-  const params = useLocalSearchParams<{ deviceId?: string; name?: string }>();
+  // authKey is set when coming from a Gadgetbridge import that carried the key.
+  const params = useLocalSearchParams<{ deviceId?: string; name?: string; authKey?: string }>();
   const deviceId = String(params.deviceId ?? '');
   const name = String(params.name ?? '');
 
-  const [raw, setRaw] = useState('');
+  const [raw, setRaw] = useState(() => String(params.authKey ?? ''));
   const [pairing, setPairing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);

@@ -61,6 +61,38 @@ export const cache = {
   clear(): void {
     storage.clearAll();
   },
+
+  /**
+   * Every key's raw envelope as one JSON string — the JS half of a Kodō
+   * backup. Derived per-day dashboard snapshots are skipped (the native store
+   * rebuilds them).
+   */
+  exportSnapshot(): string {
+    const out: Record<string, string> = {};
+    for (const key of storage.getAllKeys()) {
+      if (key.startsWith('dashboard-summary:')) continue;
+      const raw = storage.getString(key);
+      if (raw != null) out[key] = raw;
+    }
+    return JSON.stringify({ v: 1, entries: out });
+  },
+
+  /** Applies a snapshot from `exportSnapshot`. Unknown shapes are ignored. */
+  importSnapshot(json: string): number {
+    try {
+      const parsed = JSON.parse(json) as { v?: unknown; entries?: Record<string, unknown> };
+      if (parsed.v !== 1 || !parsed.entries) return 0;
+      let n = 0;
+      for (const [key, raw] of Object.entries(parsed.entries)) {
+        if (typeof raw !== 'string') continue;
+        storage.set(key, raw);
+        n += 1;
+      }
+      return n;
+    } catch {
+      return 0;
+    }
+  },
 };
 
 export const cacheKeys = {

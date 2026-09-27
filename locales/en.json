@@ -27,7 +27,8 @@
         "local": "Local first · nothing leaves this phone",
         "battery": "Battery-aware · no always-on service",
         "single": "Made only for Mi Band 9 Active"
-      }
+      },
+      "restore": "Restore a backup or import from Gadgetbridge"
     },
     "connect": {
       "title": "Find your band",
@@ -201,6 +202,10 @@
       "sleepSchedule": {
         "title": "Bedtime mode",
         "body": "Quiet hours for the band"
+      },
+      "backup": {
+        "title": "Backup & import",
+        "body": "Save everything, restore, or bring your Gadgetbridge history"
       }
     },
     "danger": {
@@ -419,6 +424,33 @@
       },
       "delete": "Delete reminder",
       "full": "All reminder slots are used"
+    },
+    "backup": {
+      "create": "Back up now",
+      "createBody": "Samples, band settings and app preferences in one .zip you can save anywhere.",
+      "includeKey": "Include the auth key",
+      "includeKeyOn": "Restore pairs automatically — keep this file private",
+      "includeKeyOff": "You'll need the key again after restoring",
+      "sharing": "Preparing backup…",
+      "done": "Backup ready ({{size}})",
+      "restore": "Restore a Kodō backup",
+      "restoreBody": "Replaces matching data; nothing else is deleted.",
+      "confirmRestore": "Restore this backup?",
+      "confirmBody": "{{rows}} records from {{date}}{{band}}",
+      "restored": "Restored {{rows}} records",
+      "gb": "Import from Gadgetbridge",
+      "gbBody": "In Gadgetbridge open Settings → Data management → Export zip (or Export database), then pick the file here. Heart rate, steps, SpO₂, stress, sleep and workouts are copied.",
+      "gbPick": "Choose export file",
+      "gbDevices": "Devices in this export",
+      "gbNone": "No Xiaomi band found in this file",
+      "gbImport": "Import history",
+      "gbImported": "Imported {{days}} days: {{samples}} samples, {{nights}} nights, {{workouts}} workouts",
+      "gbPair": "Pair with this band's key",
+      "gbKeyFound": "Auth key found",
+      "gbRange": "{{from}} – {{to}} · {{count}} samples",
+      "working": "Working… {{pct}}%",
+      "failed": "That didn't work",
+      "notKodo": "This isn't a Kodō backup"
     }
   },
   "sleep": {
