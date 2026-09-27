@@ -136,6 +136,8 @@ const BAND_ENTRIES: readonly NavEntry[] = [
   { icon: 'band', key: 'device', href: '/(settings)/device' },
   { icon: 'heart', key: 'health', href: '/(settings)/health' },
   { icon: 'alarm', key: 'alarms', href: '/(settings)/alarms' },
+  { icon: 'clock', key: 'reminders', href: '/(settings)/reminders' },
+  { icon: 'moon', key: 'sleepSchedule', href: '/(settings)/sleep-schedule' },
   { icon: 'bell', key: 'notifications', href: '/(tabs)/notifications' },
   { icon: 'cloud', key: 'weather', href: '/(settings)/weather' },
   { icon: 'watchface', key: 'watchface', href: '/(settings)/watchface' },
@@ -143,6 +145,8 @@ const BAND_ENTRIES: readonly NavEntry[] = [
 
 const APP_ENTRIES: readonly NavEntry[] = [
   { icon: 'sync', key: 'sync', href: '/(settings)/sync' },
+  { icon: 'shield', key: 'connection', href: '/(settings)/connection' },
+  { icon: 'database', key: 'backup', href: '/(settings)/backup' },
   { icon: 'palette', key: 'appearance', href: '/(settings)/appearance' },
   { icon: 'info', key: 'about', href: '/(settings)/about' },
 ];
