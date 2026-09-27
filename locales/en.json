@@ -193,6 +193,14 @@
       "about": {
         "title": "About",
         "body": "Version, license, credits"
+      },
+      "reminders": {
+        "title": "Reminders",
+        "body": "Short to-dos that pop up on the band"
+      },
+      "sleepSchedule": {
+        "title": "Bedtime mode",
+        "body": "Quiet hours for the band"
       }
     },
     "danger": {
@@ -283,7 +291,23 @@
       "camera": "Camera remote",
       "cameraBody": "Take photos from the band's camera app",
       "gps": "Phone GPS for workouts",
-      "gpsBody": "Share the phone's location when the band starts an outdoor workout"
+      "gpsBody": "Share the phone's location when the band starts an outdoor workout",
+      "live": "Right now",
+      "worn": "On wrist",
+      "charging": "Charging",
+      "asleep": "Asleep",
+      "yes": "Yes",
+      "no": "No",
+      "screenOn": "Wake screen for notifications",
+      "screenOnBody": "Light up the band when a notification arrives",
+      "lock": "Band lock",
+      "lockBody": "Ask for a 6-digit code when the band is put on",
+      "lockSet": "Set code",
+      "lockPlaceholder": "6 digits",
+      "displayItems": "Band screens",
+      "displayItemsBody": "Choose which apps appear on the band",
+      "more": "In “More”",
+      "alwaysOn": "Always on"
     },
     "health": {
       "hr": "Heart rate",
@@ -372,6 +396,29 @@
       "remove": "Remove",
       "empty": "Connect the band to list its faces",
       "installed_ok": "Installed {{name}}"
+    },
+    "sleepSchedule": {
+      "enabled": "Bedtime mode",
+      "enabledBody": "Dims the band and silences alerts on schedule",
+      "bedtime": "Bedtime",
+      "wake": "Wake up"
+    },
+    "reminders": {
+      "slots": "{{used}} / {{max}} reminders",
+      "add": "Add reminder",
+      "empty": "No reminders on the band",
+      "titleLabel": "Title (max 20 characters)",
+      "when": "When",
+      "repeat": "Repeat",
+      "repeats": {
+        "once": "Once",
+        "daily": "Daily",
+        "weekly": "Weekly",
+        "monthly": "Monthly",
+        "yearly": "Yearly"
+      },
+      "delete": "Delete reminder",
+      "full": "All reminder slots are used"
     }
   }
 }

@@ -193,6 +193,14 @@
       "about": {
         "title": "關於",
         "body": "版本、授權、致謝"
+      },
+      "reminders": {
+        "title": "提醒事項",
+        "body": "在手環跳出的短提醒"
+      },
+      "sleepSchedule": {
+        "title": "就寢模式",
+        "body": "手環的安靜時段"
       }
     },
     "danger": {
@@ -283,7 +291,23 @@
       "camera": "相機遙控",
       "cameraBody": "從手環的相機 App 拍照",
       "gps": "運動時使用手機 GPS",
-      "gpsBody": "手環開始戶外運動時分享手機定位"
+      "gpsBody": "手環開始戶外運動時分享手機定位",
+      "live": "目前狀態",
+      "worn": "佩戴中",
+      "charging": "充電中",
+      "asleep": "睡眠中",
+      "yes": "是",
+      "no": "否",
+      "screenOn": "通知時亮屏",
+      "screenOnBody": "收到通知時點亮手環螢幕",
+      "lock": "手環鎖定",
+      "lockBody": "戴上手環時要求 6 位數密碼",
+      "lockSet": "設定密碼",
+      "lockPlaceholder": "6 位數字",
+      "displayItems": "手環畫面",
+      "displayItemsBody": "選擇手環上要顯示哪些功能",
+      "more": "在「更多」中",
+      "alwaysOn": "固定開啟"
     },
     "health": {
       "hr": "心率",
@@ -372,6 +396,29 @@
       "remove": "移除",
       "empty": "連接手環後列出錶盤",
       "installed_ok": "已安裝 {{name}}"
+    },
+    "sleepSchedule": {
+      "enabled": "就寢模式",
+      "enabledBody": "依排程調暗手環並靜音提醒",
+      "bedtime": "就寢",
+      "wake": "起床"
+    },
+    "reminders": {
+      "slots": "已用 {{used}} / {{max}} 個提醒",
+      "add": "新增提醒",
+      "empty": "手環上沒有提醒",
+      "titleLabel": "標題(最多 20 字)",
+      "when": "時間",
+      "repeat": "重複",
+      "repeats": {
+        "once": "一次",
+        "daily": "每天",
+        "weekly": "每週",
+        "monthly": "每月",
+        "yearly": "每年"
+      },
+      "delete": "刪除提醒",
+      "full": "提醒數量已達上限"
     }
   }
 }
