@@ -8,15 +8,17 @@ This project only ships to Android. Every battery decision below is enforced in 
 
 1. **Persistent link, passive only.** While a band is paired we keep one GATT connection open so notifications, calls, music, find-phone and band-initiated GPS reach the phone the moment they happen. This is what Gadgetbridge does. It costs almost nothing because:
    - It is a normal GATT client with **no foreground service**, **no scanning** and **no wake lock**.
-   - After an unexpected drop we re-arm `connectGatt(autoConnect = true)`, so the Bluetooth controller reconnects when the band comes back in range. The app does no polling.
-   - Re-arm delays are 1 s after a clean drop and 5 s after a stack error, backing off to 10 min after repeated failures.
-   - Reconnect stops entirely on a wrong key, a user disconnect or unpair, or when Bluetooth is turned off, and resumes when it is turned back on.
+   - After a clean drop (status 0, 8 = out of range / supervision timeout, 19, 22) we re-arm `connectGatt(autoConnect = true)` **immediately**, while the disconnect callback still holds the CPU. A Handler delay would not fire during suspend. After a stack error (129/133/147) we wait 5 s, then back off 5 s → 10 min. The Bluetooth controller reconnects when the band returns; the app does no polling.
+   - Every process start re-arms the reconnect without scanning: reboot (notification-listener rebind or WorkManager's boot reschedule), an OEM kill, or a worker wake-up.
+   - A user disconnect is persisted. Process restarts and the worker respect it until the next explicit connect or pair.
+   - Reconnect stops on a wrong key or missing permission, and pauses while Bluetooth is off. It resumes when Bluetooth comes back.
    - Everything is tagged `MB9A_POWER` in logcat.
+   - **Keep-alive anchor:** the bound `NotificationListenerService` keeps the process out of Android's cached/frozen state. Without notification access the link is best-effort. Settings › Connection & power shows whether the listener is connected.
 2. **Foreground services only while the user is doing something.** The only one is `MiBand9GpsService` (`FOREGROUND_SERVICE_TYPE_LOCATION`). It runs only while a phone-GPS workout is active and stops on workout end, or 2 min after the band disconnects. Sync never uses a foreground service.
 3. **We never acquire a `WAKE_LOCK`.** WorkManager's merged manifest declares the permission for its own scheduler; none of our code holds one.
 4. **No background location permission.** BLE scanning needs `ACCESS_FINE_LOCATION` only in the foreground (onboarding / re-pair), and GPS workouts run inside the foreground service above. We never request `ACCESS_BACKGROUND_LOCATION`.
 5. **Periodic sync interval ≥ 30 min** (`PeriodicWorkRequest`; Android's minimum is 15, we clamp to 30 natively). The user can lengthen it but not shorten it.
-6. **Realtime HR streaming off by default.** It is the single biggest power sink on the band and the phone radio.
+6. **Realtime HR streaming off by default.** It is the single biggest power sink on the band and the phone radio. When the user turns it on, it stops automatically when the last listener unsubscribes, on disconnect, and after 5 minutes.
 
 ## BLE scan policy
 
@@ -32,7 +34,7 @@ We never run a background `BluetoothLeScanner`. Scans stop on a Handler-posted t
 
 | Job | Cadence | Constraints |
 |---|---|---|
-| `MiBand9PeriodicSyncWorker` | every 30 min (user: 30 min–4 h) | `requiresBatteryNotLow`. Uses the existing link (connects only if needed) → `ActivitySync` → Health Connect export of yesterday and today |
+| `MiBand9PeriodicSyncWorker` | every 30 min (user: 30 min–4 h) | `requiresBatteryNotLow`. Uses the existing link (connects only if needed) → `ActivitySync` (one sync at a time app-wide) → Health Connect export of yesterday and today. The setting is persisted natively and re-applied with `KEEP` at process start. The job skips runs after a user disconnect and cancels itself when no band is paired. |
 | `OwmWeatherWorker` | every ≥ 6 h, **only if** the user entered an OpenWeatherMap key | network connected, `requiresBatteryNotLow` |
 | `CalendarPushWorker` | every 6 h, only when calendar sync is on | `requiresBatteryNotLow`; pushes only if already connected |
 
@@ -66,7 +68,7 @@ On aggressive OEM ROMs (MIUI, ColorOS, EMUI) the Sync & data page shows whether 
 
 ## Auditing
 
-Every wake-up and link transition logs under the `MB9A_POWER` tag. After a 24 h soak, run `adb shell dumpsys batterystats --charged com.kidneyweakx.kodo` and check that:
+Every wake-up and link transition logs under the `MB9A_POWER` tag through `PowerLog`. PowerLog also keeps a persisted 24 h wake-up count and the last 50 events, both shown in Settings › Connection & power. Event kinds include `process_start`, `worker`, `connected`, `disconnected`, `reconnect_armed` and `realtime_hr`. After a 24 h soak, run `adb shell dumpsys batterystats --charged com.kidneyweakx.kodo` and check that:
 
 - Wake-ups stay under 50 per day.
 - There are no wakelocks attributed to the app outside WorkManager.
