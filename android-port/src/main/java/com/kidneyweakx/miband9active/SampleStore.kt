@@ -39,6 +39,7 @@ import android.database.sqlite.SQLiteOpenHelper
 import com.kidneyweakx.miband9active.xiaomi.activity.DailySummarySample
 import com.kidneyweakx.miband9active.xiaomi.activity.ManualSample
 import com.kidneyweakx.miband9active.xiaomi.activity.NOT_MEASURED
+import com.kidneyweakx.miband9active.xiaomi.activity.SleepNightAssembler
 import com.kidneyweakx.miband9active.xiaomi.activity.SleepStageSample
 import com.kidneyweakx.miband9active.xiaomi.activity.SleepSummary
 import com.kidneyweakx.miband9active.xiaomi.activity.WorkoutFields
@@ -153,7 +154,7 @@ object SampleStore {
     private val db: SQLiteDatabase by lazy { Helper(AppContext.context).writableDatabase }
 
     /**
-     * Raw access for the backup / import layer (dataport/*): runs [block] in
+     * Raw access for the backup / import layer (the dataport package): runs [block] in
      * one transaction on the store's own connection so dumps and restores are
      * atomic and never race a sync. Everything else should use the typed
      * upsert/read functions below.
@@ -521,20 +522,11 @@ object SampleStore {
         return (auto + manual).sortedBy { it.timestampSec }
     }
 
-    /**
-     * Sleep sessions that ended (woke up) during [date]. Overlapping sessions
-     * for the same night (the band re-emits a growing session with a new
-     * bedtime) are collapsed, keeping the longer one.
-     */
-    fun sleepSessionsEndingOn(date: LocalDate): List<SleepSummary> {
-        val (from, to) = dayRange(date)
-        return sleepSessionsWakingBetween(from, to)
-    }
-
-    fun sleepSessionsWakingBetween(fromSec: Long, toSec: Long): List<SleepSummary> {
-        val all = db.rawQuery(
+    /** Raw sleep-session rows overlapping [fromSec, toSec) (wake >= from, bed < to), by bedtime. */
+    fun sleepFragments(fromSec: Long, toSec: Long): List<SleepSummary> =
+        db.rawQuery(
             """SELECT bed_ts, wake_ts, is_awake, total_min, deep_min, light_min, rem_min, awake_min
-               FROM sleep_session WHERE wake_ts >= ? AND wake_ts < ? ORDER BY bed_ts""",
+               FROM sleep_session WHERE wake_ts >= ? AND bed_ts < ? ORDER BY bed_ts""",
             arrayOf(fromSec.toString(), toSec.toString()),
         ).use { c ->
             val out = ArrayList<SleepSummary>()
@@ -552,18 +544,54 @@ object SampleStore {
             }
             out
         }
-        val kept = ArrayList<SleepSummary>()
-        for (s in all) {
-            val last = kept.lastOrNull()
-            if (last != null && s.bedTimeSec < last.wakeupTimeSec) {
-                val lastLen = last.wakeupTimeSec - last.bedTimeSec
-                val sLen = s.wakeupTimeSec - s.bedTimeSec
-                if (sLen > lastLen) kept[kept.size - 1] = s
-            } else {
-                kept += s
-            }
+
+    /** Start timestamps of minute samples in [fromSec, toSec) with steps > 0, ascending. */
+    fun stepMinutes(fromSec: Long, toSec: Long): LongArray =
+        db.rawQuery(
+            "SELECT ts FROM activity_sample WHERE steps > 0 AND ts >= ? AND ts < ? ORDER BY ts",
+            arrayOf(fromSec.toString(), toSec.toString()),
+        ).use { c ->
+            val out = LongArray(c.count)
+            var i = 0
+            while (c.moveToNext()) out[i++] = c.getLong(0)
+            out
         }
-        return kept
+
+    /**
+     * Nights (sessions grouped by local wake-up date, main sleep + naps) for
+     * every date in [from]..[to] that has one, ascending. Assembly rules live
+     * in [SleepNightAssembler]; this only loads a padded window so fragments
+     * that merge across the range edges are seen whole.
+     */
+    fun sleepNights(from: LocalDate, to: LocalDate): List<SleepNightAssembler.Night> {
+        val fromSec = dayRange(from).first - SLEEP_WINDOW_PAD_SEC
+        val toSec = dayRange(to).second + SLEEP_WINDOW_PAD_SEC
+        val frags = sleepFragments(fromSec, toSec)
+        if (frags.isEmpty()) return emptyList()
+        val lo = frags.minOf { it.bedTimeSec } - SleepNightAssembler.PRE_BED_STAGE_SLACK_SEC
+        val hi = frags.maxOf { it.wakeupTimeSec }
+        return SleepNightAssembler
+            .nights(frags, sleepStages(lo, hi), stepMinutes(lo, hi), zone())
+            .filter { !it.date.isBefore(from) && !it.date.isAfter(to) }
+    }
+
+    fun sleepNight(date: LocalDate): SleepNightAssembler.Night? = sleepNights(date, date).firstOrNull()
+
+    /** avg / min of the band's automatic minute samples in [fromSec, toSec); null when none. */
+    data class Vitals(val avgHr: Double?, val minHr: Int?, val avgSpo2: Double?, val minSpo2: Int?)
+
+    fun vitals(fromSec: Long, toSec: Long): Vitals {
+        fun agg(col: String, range: IntRange): Pair<Double?, Int?> =
+            db.rawQuery(
+                "SELECT AVG($col), MIN($col), COUNT($col) FROM activity_sample " +
+                    "WHERE ts >= ? AND ts < ? AND $col BETWEEN ? AND ?",
+                arrayOf(fromSec.toString(), toSec.toString(), range.first.toString(), range.last.toString()),
+            ).use { c ->
+                if (!c.moveToFirst() || c.getInt(2) == 0) null to null else c.getDouble(0) to c.getInt(1)
+            }
+        val (avgHr, minHr) = agg("hr", HR_VALID)
+        val (avgSpo2, minSpo2) = agg("spo2", SPO2_VALID)
+        return Vitals(avgHr, minHr, avgSpo2, minSpo2)
     }
 
     /** Stage changes within [fromSec, toSec], sorted. */
@@ -655,8 +683,8 @@ object SampleStore {
     fun dayAggregate(date: LocalDate): DayAggregate? {
         val samples = loadActivity(date)
         val summary = loadDailySummary(date)
-        val sleep = sleepSessionsEndingOn(date)
-        if (samples.isEmpty() && summary == null && sleep.isEmpty()) return null
+        val night = sleepNight(date)
+        if (samples.isEmpty() && summary == null && night == null) return null
 
         val (from, to) = dayRange(date)
         val stepValues = samples.mapNotNull { s -> s.steps.takeIf { it != NOT_MEASURED && it >= 0 } }
@@ -666,7 +694,8 @@ object SampleStore {
         val stress = stress(from, to)
         val spo2 = spo2(from, to)
 
-        val sleepMinutes = sleep.mapNotNull { it.totalMinutes }.takeIf { it.isNotEmpty() }?.sum()
+        // Main sleep + naps that ended today (Gadgetbridge sums every session of the day).
+        val sleepMinutes = night?.sessions?.sumOf { it.totalMinutes }
 
         return DayAggregate(
             date = date,
@@ -698,6 +727,9 @@ object SampleStore {
             AppContext.context.getSharedPreferences(LEGACY_PREFS, Context.MODE_PRIVATE).edit().clear().apply()
         }
     }
+
+    /** Padding around a night query so merges across the range edges are seen whole. */
+    private const val SLEEP_WINDOW_PAD_SEC = 36L * 3600L
 
     val HR_VALID = 20..250
     val STRESS_VALID = 1..100

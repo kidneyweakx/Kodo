@@ -36,10 +36,15 @@ import type {
   StressSample,
   WorkoutSummary,
 } from '@/modules/native';
-import type { SleepSessionSummary, Spo2Sample } from '@/modules/native/health/health.nitro';
+import type {
+  SleepNap,
+  SleepNight,
+  SleepSessionSummary,
+  Spo2Sample,
+} from '@/modules/native/health/health.nitro';
 import { safeCall } from '@/modules/native/safe';
 
-export type { SleepSessionSummary, Spo2Sample };
+export type { SleepNap, SleepNight, SleepSessionSummary, Spo2Sample };
 
 /** Local calendar date `YYYY-MM-DD` (NOT `toISOString()`, which is UTC). */
 export const localDateIso = (d: Date = new Date()): string => {
@@ -86,6 +91,18 @@ export const healthStore = {
   },
   getSpo2Series(dateIso: string): readonly Spo2Sample[] {
     return safeCall(() => NativeHealthStore().getSpo2Series(dateIso), []);
+  },
+  /**
+   * The night that ended (woke up) on `dateIso`: main sleep + naps, stage
+   * minutes, segments, sleep HR / SpO₂. Null when the band sent no sleep
+   * ending that day. Assembly rules: see `SleepNight` in health.nitro.ts.
+   */
+  getSleepNight(dateIso: string): SleepNight | null {
+    return safeCall(() => NativeHealthStore().getSleepNight(dateIso), null);
+  },
+  /** Nights in [fromIso, toIso] that have data, ascending by date (≤ 400 days). */
+  getSleepNights(fromIso: string, toIso: string): readonly SleepNight[] {
+    return safeCall(() => NativeHealthStore().getSleepNights(fromIso, toIso), []);
   },
   getSleepSession(dateIso: string): SleepSessionSummary | null {
     return safeCall(() => NativeHealthStore().getSleepSession(dateIso), null);
@@ -162,6 +179,24 @@ export function useSleepSession(dateIso: string = localDateIso()): SleepSessionS
   const version = useSyncVersion();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   return useMemo(() => healthStore.getSleepSession(dateIso), [dateIso, version]);
+}
+
+/**
+ * The night that ended on `dateIso` (default: today's local date), read
+ * synchronously on the render path (local SQLite) and re-read after each
+ * sync phase. Null = no sleep from the band for that day — render "—".
+ */
+export function useSleepNight(dateIso: string = localDateIso()): SleepNight | null {
+  const version = useSyncVersion();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => healthStore.getSleepNight(dateIso), [dateIso, version]);
+}
+
+/** Nights in [fromIso, toIso] with data, ascending; re-read after each sync phase. */
+export function useSleepNights(fromIso: string, toIso: string): readonly SleepNight[] {
+  const version = useSyncVersion();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => healthStore.getSleepNights(fromIso, toIso), [fromIso, toIso, version]);
 }
 
 /** ISO instant of the newest band sample; null until the first successful sync. */

@@ -23,15 +23,18 @@
  *   Spo2Syncer — one OxygenSaturationRecord per reading, 0 < v <= 100;
  *     manual readings use activelyRecorded metadata.
  *   RestingHeartRateSyncer — daily summary resting HR, 20..250.
- *   SleepSyncer — one SleepSessionRecord per session with stage segments
- *     (deep/light/REM/awake; unknown stages skipped).
+ *   SleepSyncer — one SleepSessionRecord per assembled session (main night
+ *     and naps; see SleepNightAssembler) with the band's stage segments
+ *     (deep/light/REM/awake; unknown stages and merged gaps skipped), and a
+ *     clientRecordId frozen per night (SleepRecordIdentity) so a growing /
+ *     re-segmented night updates one record instead of duplicating.
  *   RecordedWorkoutSyncer — ExerciseSessionRecord per workout.
  * Zone offsets come from the phone's zone at each instant
  * (offset.rules.getOffset(instant), as upstream).
  *
  * Deviations (documented):
  *   - Idempotency: upstream advances a per-type "last synced" cursor; we
- *     instead stamp every record with a deterministic clientRecordId and a
+ *     instead stamp every record (sleep: see above) with a deterministic clientRecordId and a
  *     monotonic clientRecordVersion, so re-exporting a day upserts instead
  *     of duplicating, and a grown "today" file updates the same records.
  *   - Minute records cover [ts, ts+60): Xiaomi daily-detail timestamps are
@@ -64,12 +67,14 @@ import androidx.health.connect.client.units.Length
 import androidx.health.connect.client.units.Percentage
 import com.kidneyweakx.miband9active.SampleStore
 import com.kidneyweakx.miband9active.xiaomi.activity.NOT_MEASURED
-import com.kidneyweakx.miband9active.xiaomi.activity.SleepStageSample
+import com.kidneyweakx.miband9active.xiaomi.activity.SleepNightAssembler
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
 import kotlin.reflect.KClass
+import org.json.JSONArray
+import org.json.JSONObject
 
 enum class HealthConnectKind {
     STEPS, HEART_RATE, SPO2, SLEEP, ACTIVE_CALORIES, DISTANCE, RESTING_HEART_RATE, EXERCISE,
@@ -139,14 +144,24 @@ object HealthConnectExporter {
     }
 
     /** Export one local day. Returns records written (upserted). */
-    suspend fun exportDay(context: Context, date: LocalDate): Int = exportRange(context, date, date)
+    suspend fun exportDay(context: Context, date: LocalDate, skipUnchangedSleep: Boolean = true): Int =
+        exportRange(context, date, date, skipUnchangedSleep)
 
     /**
      * Export every local day in [from]..[to] (inclusive). Only kinds with a
      * granted WRITE permission are written. Returns records written; 0 when
      * HC is unavailable or nothing is granted.
+     *
+     * [skipUnchangedSleep] (upstream SleepSyncer behaviour, used by automatic
+     * exports) skips nights whose span and stages were already written; a
+     * user-initiated export passes false and rewrites them.
      */
-    suspend fun exportRange(context: Context, from: LocalDate, to: LocalDate): Int {
+    suspend fun exportRange(
+        context: Context,
+        from: LocalDate,
+        to: LocalDate,
+        skipUnchangedSleep: Boolean = true,
+    ): Int {
         val client = client(context) ?: return 0
         val granted = client.permissionController.getGrantedPermissions()
         val kinds = HealthConnectKind.entries.filter { writePermission(it) in granted }.toSet()
@@ -251,38 +266,12 @@ object HealthConnectExporter {
             }
         }
 
+        var sleepRows: List<SleepIdentityRow>? = null
         if (HealthConnectKind.SLEEP in kinds) {
-            for (session in SampleStore.sleepSessionsWakingBetween(fromSec, toSec)) {
-                val bed = session.bedTimeSec
-                val wake = session.wakeupTimeSec
-                if (wake <= bed) continue
-                val raw = SampleStore.sleepStages(bed, wake)
-                val stages = ArrayList<SleepSessionRecord.Stage>()
-                for ((i, st) in raw.withIndex()) {
-                    val type = when (st.kind) {
-                        SleepStageSample.Kind.DEEP -> SleepSessionRecord.STAGE_TYPE_DEEP
-                        SleepStageSample.Kind.LIGHT -> SleepSessionRecord.STAGE_TYPE_LIGHT
-                        SleepStageSample.Kind.REM -> SleepSessionRecord.STAGE_TYPE_REM
-                        SleepStageSample.Kind.AWAKE -> SleepSessionRecord.STAGE_TYPE_AWAKE
-                        SleepStageSample.Kind.UNKNOWN -> null
-                    } ?: continue
-                    val start = st.timestampSec.coerceIn(bed, wake)
-                    val end = (if (i + 1 < raw.size) raw[i + 1].timestampSec else wake).coerceIn(bed, wake)
-                    if (end > start) {
-                        stages += SleepSessionRecord.Stage(Instant.ofEpochSecond(start), Instant.ofEpochSecond(end), type)
-                    }
-                }
-                records += SleepSessionRecord(
-                    startTime = Instant.ofEpochSecond(bed),
-                    startZoneOffset = off(bed),
-                    endTime = Instant.ofEpochSecond(wake),
-                    endZoneOffset = off(wake),
-                    title = "Xiaomi Smart Band 9 Active",
-                    stages = stages,
-                    // Grows as the band extends the session or adds stages.
-                    metadata = auto("sleep-$bed", wake * 1000L + stages.size.coerceAtMost(999)),
-                )
-            }
+            val (sleep, rows) = sleepRecords(context, from, to, force = !skipUnchangedSleep, off = ::off)
+            records += sleep
+            sleepRows = rows
+            deleteLegacySleepRecords(context, client, from, to)
         }
 
         if (HealthConnectKind.EXERCISE in kinds) {
@@ -301,13 +290,18 @@ object HealthConnectExporter {
             }
         }
 
-        if (records.isEmpty()) return 0
+        if (records.isEmpty()) {
+            sleepRows?.let { saveSleepRows(context, it) }
+            return 0
+        }
         var written = 0
         for (chunk in records.chunked(CHUNK_SIZE)) {
             // SecurityException (permission revoked mid-export) propagates.
             client.insertRecords(chunk)
             written += chunk.size
         }
+        // Only remember sleep ids once HC has them.
+        sleepRows?.let { saveSleepRows(context, it) }
         Log.i(TAG, "exported $written records for $from..$to")
         return written
     }
@@ -322,6 +316,7 @@ object HealthConnectExporter {
             runCatching {
                 client.deleteRecords(recordClass(kind), TimeRangeFilter.after(Instant.EPOCH))
                 types++
+                if (kind == HealthConnectKind.SLEEP) clearSleepRows(context)
             }.onFailure { Log.w(TAG, "failed to delete $kind records", it) }
         }
         return types
@@ -330,6 +325,128 @@ object HealthConnectExporter {
     suspend fun revokeAll(context: Context) {
         client(context)?.permissionController?.revokeAllPermissions()
     }
+
+    // ------------------------------------------------------------------- sleep
+
+    /**
+     * SleepSyncer: one SleepSessionRecord per detected session (main night
+     * and naps alike) of every night in [from]..[to], with the band's stages
+     * (deep / light / REM / awake; merged not-sleeping gaps and unstaged
+     * time get no stage, as upstream skips UNKNOWN samples). Ids are frozen
+     * per night by [SleepRecordIdentity]; version = wall clock so the latest
+     * write wins. Returns the records and the registry to save on success.
+     */
+    private fun sleepRecords(
+        context: Context,
+        from: LocalDate,
+        to: LocalDate,
+        force: Boolean,
+        off: (Long) -> ZoneOffset,
+    ): Pair<List<Record>, List<SleepIdentityRow>> {
+        val sessions = SampleStore.sleepNights(from, to).flatMap { it.sessions }
+        val built = sessions.map { session ->
+            val stages = session.bandStageSpans().mapNotNull { sp ->
+                val type = when (sp.kind) {
+                    SleepNightAssembler.Kind.DEEP -> SleepSessionRecord.STAGE_TYPE_DEEP
+                    SleepNightAssembler.Kind.LIGHT -> SleepSessionRecord.STAGE_TYPE_LIGHT
+                    SleepNightAssembler.Kind.REM -> SleepSessionRecord.STAGE_TYPE_REM
+                    SleepNightAssembler.Kind.AWAKE -> SleepSessionRecord.STAGE_TYPE_AWAKE
+                    else -> null
+                } ?: return@mapNotNull null
+                SleepSessionRecord.Stage(Instant.ofEpochSecond(sp.startSec), Instant.ofEpochSecond(sp.endSec), type)
+            }
+            val fingerprint = stages.size.toString() + ":" +
+                stages.joinToString(",") { "${it.startTime.epochSecond}-${it.endTime.epochSecond}-${it.stage}" }
+                    .hashCode().toUInt().toString(16)
+            session to stages to DetectedSleep(session.startSec, session.endSec, fingerprint)
+        }
+
+        val existing = SleepRecordIdentity.prune(
+            loadSleepRows(context),
+            System.currentTimeMillis() / 1000L - SLEEP_ROW_RETENTION_SEC,
+        )
+        val plan = SleepRecordIdentity.plan(existing, built.map { it.second }, force)
+        val version = System.currentTimeMillis()
+        val records = plan.planned.map { p ->
+            val stages = built[p.detectedIndex].first.second
+            SleepSessionRecord(
+                startTime = Instant.ofEpochSecond(p.startSec),
+                startZoneOffset = off(p.startSec),
+                endTime = Instant.ofEpochSecond(p.endSec),
+                endZoneOffset = off(p.endSec),
+                title = "Xiaomi Smart Band 9 Active",
+                stages = stages,
+                metadata = Metadata.autoRecorded(
+                    clientRecordId = p.clientRecordId,
+                    clientRecordVersion = version,
+                    device = DEVICE,
+                ),
+            )
+        }
+        return records to plan.rows
+    }
+
+    /**
+     * Before per-night ids, sleep was written per band session row as
+     * `mb9a-sleep-<bedtime>`. Delete those for the rows in range (HC ignores
+     * ids that don't exist) so a re-export doesn't leave duplicates. Only rows
+     * whose bedtime predates the first run of this code can have one.
+     */
+    private suspend fun deleteLegacySleepRecords(
+        context: Context,
+        client: HealthConnectClient,
+        from: LocalDate,
+        to: LocalDate,
+    ) {
+        val prefs = context.getSharedPreferences(SLEEP_PREFS, Context.MODE_PRIVATE)
+        var cutoff = prefs.getLong(KEY_LEGACY_CUTOFF, 0L)
+        if (cutoff == 0L) {
+            cutoff = System.currentTimeMillis() / 1000L
+            prefs.edit().putLong(KEY_LEGACY_CUTOFF, cutoff).apply()
+        }
+        val ids = SampleStore
+            .sleepFragments(SampleStore.dayRange(from).first - 86_400L, SampleStore.dayRange(to).second)
+            .filter { it.bedTimeSec < cutoff }
+            .map { "mb9a-sleep-${it.bedTimeSec}" }
+        if (ids.isEmpty()) return
+        runCatching {
+            client.deleteRecords(SleepSessionRecord::class, emptyList(), ids)
+        }.onFailure { Log.w(TAG, "failed to delete legacy sleep records", it) }
+    }
+
+    private fun loadSleepRows(context: Context): List<SleepIdentityRow> {
+        val raw = context.getSharedPreferences(SLEEP_PREFS, Context.MODE_PRIVATE).getString(KEY_ROWS, null)
+            ?: return emptyList()
+        return runCatching {
+            val arr = JSONArray(raw)
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                SleepIdentityRow(o.getString("id"), o.getLong("start"), o.getLong("end"), o.optString("fp", ""))
+            }
+        }.getOrElse {
+            Log.w(TAG, "corrupt sleep identity registry; starting over", it)
+            emptyList()
+        }
+    }
+
+    private fun saveSleepRows(context: Context, rows: List<SleepIdentityRow>) {
+        val arr = JSONArray()
+        for (r in rows) {
+            arr.put(JSONObject().put("id", r.clientRecordId).put("start", r.startSec).put("end", r.endSec).put("fp", r.fingerprint))
+        }
+        context.getSharedPreferences(SLEEP_PREFS, Context.MODE_PRIVATE).edit().putString(KEY_ROWS, arr.toString()).apply()
+    }
+
+    private fun clearSleepRows(context: Context) {
+        context.getSharedPreferences(SLEEP_PREFS, Context.MODE_PRIVATE).edit().remove(KEY_ROWS).apply()
+    }
+
+    private const val SLEEP_PREFS = "mb9a_hc_sleep_identity"
+    private const val KEY_ROWS = "rows"
+    private const val KEY_LEGACY_CUTOFF = "legacy_cutoff_sec"
+
+    /** Registry rows older than this are pruned; a re-export re-mints the same id from the unchanged start. */
+    private const val SLEEP_ROW_RETENTION_SEC = 60L * 86_400L
 
     private fun auto(id: String, version: Long): Metadata = Metadata.autoRecorded(
         clientRecordId = "mb9a-$id",

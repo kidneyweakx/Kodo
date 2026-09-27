@@ -21,8 +21,7 @@ package com.margelo.nitro.miband9active
 
 import android.util.Log
 import com.kidneyweakx.miband9active.SampleStore
-import com.kidneyweakx.miband9active.xiaomi.activity.SleepStageSample
-import com.kidneyweakx.miband9active.xiaomi.activity.SleepSummary
+import com.kidneyweakx.miband9active.xiaomi.activity.SleepNightAssembler
 import com.kidneyweakx.miband9active.xiaomi.activity.XiaomiActivityFileId
 import com.margelo.nitro.core.NullType
 import java.time.Instant
@@ -96,14 +95,28 @@ class HybridHealthStore : HybridHybridHealthStoreSpec() {
             .toTypedArray()
     }
 
+    override fun getSleepNight(dateIso: String): Variant_NullType_SleepNight {
+        val date = parseDate(dateIso) ?: return Variant_NullType_SleepNight.create(NullType.NULL)
+        val night = safe(null) { SampleStore.sleepNight(date)?.let(::toBridge) }
+            ?: return Variant_NullType_SleepNight.create(NullType.NULL)
+        return Variant_NullType_SleepNight.create(night)
+    }
+
+    override fun getSleepNights(fromIso: String, toIso: String): Array<SleepNight> {
+        val from = parseDate(fromIso) ?: return emptyArray()
+        val to = parseDate(toIso) ?: return emptyArray()
+        if (to.isBefore(from) || from.plusDays(400).isBefore(to)) return emptyArray()
+        return safe(emptyList()) { SampleStore.sleepNights(from, to).map(::toBridge) }.toTypedArray()
+    }
+
     override fun getSleepSession(dateIso: String): Variant_NullType_SleepSessionSummary {
         val date = parseDate(dateIso) ?: return Variant_NullType_SleepSessionSummary.create(NullType.NULL)
-        val s = safe(null) { mainSleep(date) }
+        val s = safe(null) { SampleStore.sleepNight(date)?.main }
             ?: return Variant_NullType_SleepSessionSummary.create(NullType.NULL)
         return Variant_NullType_SleepSessionSummary.create(
             SleepSessionSummary(
-                bedAt = iso(s.bedTimeSec),
-                wakeAt = iso(s.wakeupTimeSec),
+                bedAt = iso(s.startSec),
+                wakeAt = iso(s.endSec),
                 totalMinutes = nd(s.totalMinutes),
                 deepMinutes = nd(s.deepMinutes),
                 lightMinutes = nd(s.lightMinutes),
@@ -115,22 +128,8 @@ class HybridHealthStore : HybridHybridHealthStoreSpec() {
 
     override fun getSleepSegments(dateIso: String): Array<SleepSegment> {
         val date = parseDate(dateIso) ?: return emptyArray()
-        val session = safe(null) { mainSleep(date) } ?: return emptyArray()
-        val stages = safe(emptyList()) { SampleStore.sleepStages(session.bedTimeSec, session.wakeupTimeSec) }
-        val out = ArrayList<SleepSegment>()
-        for ((i, st) in stages.withIndex()) {
-            val end = if (i + 1 < stages.size) stages[i + 1].timestampSec else session.wakeupTimeSec
-            if (end <= st.timestampSec) continue
-            val stage = when (st.kind) {
-                SleepStageSample.Kind.AWAKE -> SleepStage.AWAKE
-                SleepStageSample.Kind.LIGHT -> SleepStage.LIGHT
-                SleepStageSample.Kind.DEEP -> SleepStage.DEEP
-                SleepStageSample.Kind.REM -> SleepStage.REM
-                SleepStageSample.Kind.UNKNOWN -> null // not sleeping / n-a: no segment
-            } ?: continue
-            out += SleepSegment(startedAt = iso(st.timestampSec), endedAt = iso(end), stage = stage)
-        }
-        return out.toTypedArray()
+        val s = safe(null) { SampleStore.sleepNight(date)?.main } ?: return emptyArray()
+        return segments(s)
     }
 
     override fun getRecentWorkouts(limit: Double): Array<WorkoutSummary> {
@@ -184,9 +183,44 @@ class HybridHealthStore : HybridHybridHealthStoreSpec() {
         )
     }
 
-    /** Longest session that woke up on [date]. */
-    private fun mainSleep(date: LocalDate): SleepSummary? =
-        SampleStore.sleepSessionsEndingOn(date).maxByOrNull { it.wakeupTimeSec - it.bedTimeSec }
+    private fun toBridge(n: SleepNightAssembler.Night): SleepNight {
+        val m = n.main
+        val v = SampleStore.vitals(m.startSec, m.endSec)
+        return SleepNight(
+            date = n.date.toString(),
+            bedAt = iso(m.startSec),
+            wakeAt = iso(m.endSec),
+            totalMinutes = m.totalMinutes.toDouble(),
+            deepMinutes = nd(m.deepMinutes),
+            lightMinutes = nd(m.lightMinutes),
+            remMinutes = nd(m.remMinutes),
+            awakeMinutes = nd(m.awakeMinutes),
+            awakeCount = nd(m.awakeCount),
+            segments = segments(m),
+            // The v4+ "sleep quality" byte is unverified upstream (read, never
+            // stored or shown by Gadgetbridge) — not a score we can vouch for.
+            score = nd(null),
+            avgHeartRate = ndD(v.avgHr?.let { Math.round(it).toDouble() }),
+            lowestHeartRate = nd(v.minHr),
+            avgSpo2 = ndD(v.avgSpo2?.let { Math.round(it).toDouble() }),
+            lowestSpo2 = nd(v.minSpo2),
+            naps = n.naps.map {
+                SleepNap(bedAt = iso(it.startSec), wakeAt = iso(it.endSec), totalMinutes = it.totalMinutes.toDouble())
+            }.toTypedArray(),
+        )
+    }
+
+    private fun segments(s: SleepNightAssembler.Session): Array<SleepSegment> =
+        s.displaySegments().mapNotNull { sp ->
+            val stage = when (sp.kind) {
+                SleepNightAssembler.Kind.AWAKE -> SleepStage.AWAKE
+                SleepNightAssembler.Kind.LIGHT -> SleepStage.LIGHT
+                SleepNightAssembler.Kind.DEEP -> SleepStage.DEEP
+                SleepNightAssembler.Kind.REM -> SleepStage.REM
+                else -> null
+            } ?: return@mapNotNull null
+            SleepSegment(startedAt = iso(sp.startSec), endedAt = iso(sp.endSec), stage = stage)
+        }.toTypedArray()
 
     private fun workoutKind(xiaomiType: Int?, subtypeCode: Int): WorkoutKind {
         if (xiaomiType != null) {

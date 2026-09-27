@@ -99,7 +99,9 @@ class HybridHealthConnect : HybridHybridHealthConnectSpec() {
         val to = LocalDate.parse(toIso.take(10))
         require(!to.isBefore(from)) { "toIso is before fromIso" }
         require(!from.plusDays(400).isBefore(to)) { "range too large" }
-        HealthConnectExporter.exportRange(AppContext.context, from, to).toDouble()
+        // User-initiated: rewrite sleep nights even if unchanged since the last
+        // export (e.g. the user deleted them in the Health Connect app).
+        HealthConnectExporter.exportRange(AppContext.context, from, to, skipUnchangedSleep = false).toDouble()
     }
 
     override fun revokeAndClear(): Promise<Unit> = Promise.async {
