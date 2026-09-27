@@ -1,0 +1,11 @@
+# Keep workflow actions current (Node runtime deprecations land here first).
+# JS/native deps are upgraded deliberately with `expo install --fix`, not by bot.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ['*']
