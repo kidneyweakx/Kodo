@@ -229,7 +229,7 @@ object CalendarService {
 
 class CalendarPushWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
-        Log.i("MB9A_POWER", "calendar worker wake")
+        com.kidneyweakx.miband9active.xiaomi.protocol.PowerLog.event(com.kidneyweakx.miband9active.xiaomi.protocol.PowerLog.WORKER, "calendar push", wakeup = true)
         CalendarService.sync()
         return Result.success()
     }

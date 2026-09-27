@@ -225,7 +225,7 @@ object OwmWeather {
 
 class OwmWeatherWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
-        Log.i("MB9A_POWER", "OWM weather worker wake")
+        com.kidneyweakx.miband9active.xiaomi.protocol.PowerLog.event(com.kidneyweakx.miband9active.xiaomi.protocol.PowerLog.WORKER, "OpenWeatherMap refresh", wakeup = true)
         OwmWeather.refresh()
         // Never retry-loop: the next periodic window will try again.
         return Result.success()

@@ -21,6 +21,9 @@ import { syncStatus } from '@/libs/services/syncStatus';
 import { NativeBandLink, NativeHealthConnect } from '@/modules/native';
 import { safeCall, safeUnsubscribe, safeAsync } from '@/modules/native/safe';
 import type { BatteryInfo, ConnectionState, DiscoveredBand, PairedBand } from '@/modules/native';
+import type { LinkDiagnostics, LinkEvent } from '@/modules/native/bandLink/bandLink.nitro';
+
+export type { LinkDiagnostics, LinkEvent };
 
 export type BandLinkErrorCode =
   | 'AUTH_KEY_INVALID'
@@ -160,6 +163,40 @@ export const bandLink = {
   /** Ask the band for a fresh battery reading (no-op when not connected). */
   requestBattery(): void {
     safeCall(() => NativeBandLink().requestBattery(), undefined);
+  },
+
+  /**
+   * Keep-alive / power diagnostics (sync, cheap — safe on the render path).
+   * `null` only when the native module is unavailable.
+   */
+  getDiagnostics(): LinkDiagnostics | null {
+    return safeCall<LinkDiagnostics | null>(() => NativeBandLink().getDiagnostics(), null);
+  },
+
+  /** Clears the persisted MB9A_POWER event ring and wake-up counter. */
+  clearDiagnostics(): void {
+    safeCall(() => NativeBandLink().clearDiagnostics(), undefined);
+  },
+
+  /**
+   * Opt-in realtime heart rate (docs/POWER.md rule 6). No-op when not
+   * connected. Native stops it when the last listener unsubscribes, on
+   * disconnect, and after 5 minutes.
+   */
+  startRealtimeHeartRate(): void {
+    safeCall(() => NativeBandLink().startRealtimeHeartRate(), undefined);
+  },
+
+  stopRealtimeHeartRate(): void {
+    safeCall(() => NativeBandLink().stopRealtimeHeartRate(), undefined);
+  },
+
+  /**
+   * ~1 Hz bpm stream. Keep it off the React render path (Rule 9): write into a
+   * ref and mirror into state on a 250–500 ms throttle.
+   */
+  onRealtimeHeartRate(listener: (bpm: number) => void): () => void {
+    return safeUnsubscribe(() => NativeBandLink().onRealtimeHeartRate(listener));
   },
 
   async syncSince(sinceIso: string): Promise<number> {

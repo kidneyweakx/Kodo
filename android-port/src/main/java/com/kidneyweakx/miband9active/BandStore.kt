@@ -42,6 +42,7 @@ object BandStore {
     private const val K_NAME = "name"
     private const val K_KEY = "authKeyHex"
     private const val K_PAIRED_AT = "pairedAtIso"
+    private const val K_USER_DISCONNECTED = "userDisconnected"
 
     private fun prefs(): SharedPreferences =
         AppContext.context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -56,6 +57,7 @@ object BandStore {
             .putString(K_NAME, b.name)
             .putString(K_KEY, b.authKeyHex)
             .putString(K_PAIRED_AT, b.pairedAtIso)
+            .putBoolean(K_USER_DISCONNECTED, false) // a fresh pair is an explicit connect
             // commit(): the caller (pair) resolves right after; make sure a
             // process death immediately afterwards doesn't lose the band.
             .commit()
@@ -82,6 +84,19 @@ object BandStore {
         loaded = true
         return cached
     }
+
+    /**
+     * True after a user-initiated disconnect, until the next explicit connect.
+     * Persisted so a process restart (NLS rebind, WorkManager) does not
+     * silently re-arm the passive reconnect the user just turned off.
+     */
+    var userDisconnected: Boolean
+        get() = prefs().getBoolean(K_USER_DISCONNECTED, false)
+        set(value) {
+            if (prefs().getBoolean(K_USER_DISCONNECTED, false) != value) {
+                prefs().edit().putBoolean(K_USER_DISCONNECTED, value).apply()
+            }
+        }
 
     @Synchronized
     fun clear() {

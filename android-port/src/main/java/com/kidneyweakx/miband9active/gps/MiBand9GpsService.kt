@@ -85,14 +85,14 @@ class MiBand9GpsService : Service() {
             }
             lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener, Looper.getMainLooper())
             listening = true
-            Log.i("MB9A_POWER", "workout GPS listener ON")
+            com.kidneyweakx.miband9active.xiaomi.protocol.PowerLog.event(com.kidneyweakx.miband9active.xiaomi.protocol.PowerLog.GPS, "workout GPS listener ON (foreground service)")
         }
         return START_NOT_STICKY
     }
 
     override fun onDestroy() {
         try { locationManager?.removeUpdates(listener) } catch (_: Throwable) {}
-        if (listening) Log.i("MB9A_POWER", "workout GPS listener OFF")
+        if (listening) com.kidneyweakx.miband9active.xiaomi.protocol.PowerLog.event(com.kidneyweakx.miband9active.xiaomi.protocol.PowerLog.GPS, "workout GPS listener OFF")
         listening = false
         running = false
         latestLocation = null

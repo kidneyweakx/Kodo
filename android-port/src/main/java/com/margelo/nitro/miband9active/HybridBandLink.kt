@@ -37,8 +37,14 @@ import com.kidneyweakx.miband9active.sync.ActivitySync
 import com.kidneyweakx.miband9active.sync.MiBand9PeriodicSyncWorker
 import com.kidneyweakx.miband9active.xiaomi.auth.XiaomiCrypto
 import com.kidneyweakx.miband9active.xiaomi.protocol.BandLinkException
+import com.kidneyweakx.miband9active.xiaomi.notifications.MiBand9NotificationListener
 import com.kidneyweakx.miband9active.xiaomi.protocol.MiBand9BleDriver
+import com.kidneyweakx.miband9active.xiaomi.protocol.PowerLog
+import com.kidneyweakx.miband9active.xiaomi.services.DeviceFeatures
+import com.kidneyweakx.miband9active.xiaomi.services.RealtimeStatsService
 import com.kidneyweakx.miband9active.xiaomi.services.SystemCommands
+import android.os.PowerManager
+import com.margelo.nitro.core.NullType
 import com.margelo.nitro.core.Promise
 import java.time.Instant
 import java.time.LocalDate
@@ -75,6 +81,7 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
     @Volatile private var activeScan: ActiveScan? = null
 
     init {
+        DeviceFeatures.ensureStarted()
         // The driver singleton outlives any Hybrid instance; subscribe once here.
         scope.launch {
             driver.state.collect { st ->
@@ -163,7 +170,7 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
         } catch (e: SecurityException) {
             throw BandLinkException.from(e)
         }
-        Log.i("MB9A_POWER", "BLE scan started for ${durationMs}ms")
+        PowerLog.event(PowerLog.SCAN, "foreground scan started (${durationMs}ms)")
         val scan = ActiveScan(scanner, cb, done)
         activeScan = scan
         scanning = true
@@ -175,7 +182,7 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
             try { scanner.stopScan(cb) } catch (_: Throwable) {}
             scanning = false
             notifyConnectionState()
-            Log.i("MB9A_POWER", "BLE scan stopped, matched=${results.size}")
+            PowerLog.event(PowerLog.SCAN, "scan stopped, matched=${results.size}")
         }
         synchronized(results) { results.toTypedArray() }
     }
@@ -236,8 +243,10 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
         } catch (t: Throwable) {
             Log.w(TAG, "disable periodic sync failed", t)
         }
+        RealtimeStatsService.stop("band forgotten")
         driver.forgetTarget()
         BandStore.clear()
+        PowerLog.event(PowerLog.RECONNECT_STOPPED, "band forgotten")
         stored?.let { removeBondBestEffort(it.id) }
     }
 
@@ -249,6 +258,9 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
     }
 
     override fun disconnect() {
+        // Persisted so a process restart / the periodic worker respect it (docs/POWER.md rule 1).
+        if (BandStore.load() != null) BandStore.userDisconnected = true
+        RealtimeStatsService.stop("user disconnect")
         driver.disconnect()
     }
 
@@ -287,16 +299,106 @@ class HybridBandLink : HybridHybridBandLinkSpec() {
     private suspend fun runSync(): Int = syncMutex.withLock {
         val startedAt = System.currentTimeMillis().toDouble()
         emitProgress("connecting", 0.0, startedAt)
-        val drv = DriverHolder.ensureConnected(CONNECT_TIMEOUT_MS)
-        val count = ActivitySync.run(drv) { phase, progress -> emitProgress(phase, progress, startedAt) }
-        emitProgress("done", 1.0, startedAt)
-        count
+        try {
+            val drv = DriverHolder.ensureConnected(CONNECT_TIMEOUT_MS)
+            // ActivitySync.run serialises with the periodic worker: a concurrent
+            // caller awaits the running exchange instead of starting a second one.
+            val count = ActivitySync.run(drv) { phase, progress -> emitProgress(phase, progress, startedAt) }
+            emitProgress("done", 1.0, startedAt)
+            PowerLog.onSyncFinished(null)
+            PowerLog.event(PowerLog.SYNC, "user sync: $count file(s)")
+            count
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            PowerLog.onSyncFinished(t.message ?: t.javaClass.simpleName)
+            throw t
+        }
     }
 
     private fun emitProgress(phase: String, progress: Double, startedAt: Double) {
         val ev = SyncProgress(phase = phase, progress = progress.coerceIn(0.0, 1.0), startedAt = startedAt)
         syncListeners.forEach { safeInvoke { it(ev) } }
     }
+
+    // ------------------------------------------------------------------ diagnostics
+
+    override fun getDiagnostics(): LinkDiagnostics {
+        val ctx = AppContext.context
+        val snap = PowerLog.snapshot()
+        val work = try {
+            MiBand9PeriodicSyncWorker.workState(ctx)
+        } catch (t: Throwable) {
+            MiBand9PeriodicSyncWorker.WorkState(false, MIN_PERIODIC_MINUTES, null)
+        }
+        return LinkDiagnostics(
+            bluetoothEnabled = bluetoothEnabled(),
+            bonded = bonded(),
+            reconnectArmed = driver.reconnectArmed,
+            reconnectAttempts = snap.reconnectAttempts.toDouble(),
+            lastConnectedAt = iso(snap.lastConnectedAt),
+            lastDisconnectedAt = iso(snap.lastDisconnectedAt),
+            lastDisconnectReason = str(snap.lastDisconnectReason),
+            periodicSyncEnabled = work.enabled,
+            periodicSyncIntervalMinutes = work.intervalMinutes.toDouble(),
+            nextPeriodicSyncAt = iso(work.nextRunAtMillis),
+            lastSyncAt = iso(snap.lastSyncAt),
+            lastSyncError = str(snap.lastSyncError),
+            notificationListenerConnected = MiBand9NotificationListener.listenerConnected,
+            ignoringBatteryOptimizations = try {
+                ctx.getSystemService(PowerManager::class.java)?.isIgnoringBatteryOptimizations(ctx.packageName) == true
+            } catch (_: Throwable) {
+                false
+            },
+            wakeupsLast24h = snap.wakeupsLast24h.toDouble(),
+            events = snap.events.map {
+                LinkEvent(at = Instant.ofEpochMilli(it.at).toString(), kind = it.kind, detail = it.detail)
+            }.toTypedArray(),
+            userDisconnected = BandStore.load() != null && BandStore.userDisconnected,
+            realtimeHeartRateActive = RealtimeStatsService.started,
+        )
+    }
+
+    override fun clearDiagnostics() {
+        PowerLog.clear()
+    }
+
+    private fun iso(ms: Long?): Variant_NullType_String =
+        ms?.let { Variant_NullType_String.create(Instant.ofEpochMilli(it).toString()) }
+            ?: Variant_NullType_String.create(NullType.NULL)
+
+    private fun str(v: String?): Variant_NullType_String =
+        v?.let { Variant_NullType_String.create(it) } ?: Variant_NullType_String.create(NullType.NULL)
+
+    private fun bluetoothEnabled(): Boolean = try {
+        AppContext.context.getSystemService(BluetoothManager::class.java)?.adapter?.isEnabled == true
+    } catch (_: Throwable) {
+        false
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun bonded(): Boolean {
+        val band = BandStore.load() ?: return false
+        return try {
+            val adapter = AppContext.context.getSystemService(BluetoothManager::class.java)?.adapter ?: return false
+            adapter.getRemoteDevice(band.id).bondState == BluetoothDevice.BOND_BONDED
+        } catch (_: Throwable) {
+            false // SecurityException without BLUETOOTH_CONNECT, invalid address
+        }
+    }
+
+    // ------------------------------------------------------------------ realtime heart rate
+
+    override fun startRealtimeHeartRate() {
+        RealtimeStatsService.start()
+    }
+
+    override fun stopRealtimeHeartRate() {
+        RealtimeStatsService.stop("stop requested")
+    }
+
+    override fun onRealtimeHeartRate(listener: (bpm: Double) -> Unit): () -> Unit =
+        RealtimeStatsService.addListener { bpm -> safeInvoke { listener(bpm.toDouble()) } }
 
     // ------------------------------------------------------------------ listeners
 

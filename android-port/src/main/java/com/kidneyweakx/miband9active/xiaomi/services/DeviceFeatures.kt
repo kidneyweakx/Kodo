@@ -19,7 +19,9 @@
 package com.kidneyweakx.miband9active.xiaomi.services
 
 import android.util.Log
+import com.kidneyweakx.miband9active.DriverHolder
 import com.kidneyweakx.miband9active.gps.WorkoutGpsController
+import com.kidneyweakx.miband9active.xiaomi.notifications.NotificationCmd
 import com.kidneyweakx.miband9active.xiaomi.protocol.MiBand9BleDriver
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -67,6 +69,13 @@ object DeviceFeatures {
                 started.set(false)
             }
         }
+        scope.launch {
+            try {
+                DriverHolder.driver.battery.collect { b -> if (b != null) SystemExtrasService.onBatteryCharging(b.charging) }
+            } catch (t: Throwable) {
+                Log.w(TAG, "battery collector died", t)
+            }
+        }
     }
 
     private fun onState(st: MiBand9BleDriver.State) {
@@ -79,6 +88,8 @@ object DeviceFeatures {
                 initJob?.cancel()
                 initJob = null
                 WorkoutGpsController.onBandDisconnected()
+                RealtimeStatsService.onDisconnected()
+                SystemExtrasService.onDisconnected()
             }
             else -> Unit
         }
@@ -86,13 +97,14 @@ object DeviceFeatures {
 
     /** XiaomiSupport.onAuthSuccess(): every service's initialize(), in upstream order. */
     private suspend fun initialize() = initMutex.withLock {
-        Log.i("MB9A_POWER", "band connected -> device-feature init")
+        Log.i(TAG, "band connected -> device-feature init")
         // onAuthSuccess(): systemService.setCurrentTime() first (with our 12/24h pref).
         step("clock") { SystemService.syncClock() }
         step("health") { HealthSettingsService.onConnected() }
         step("schedule") { ScheduleService.onConnected() }
         step("weather") { WeatherService.onConnected() }
         step("system") { SystemService.onConnected() }
+        step("system-extras") { SystemExtrasService.onConnected() }
         step("calendar") { CalendarService.onConnected() }
         step("gps") { WorkoutGpsController.onBandConnected() }
     }
@@ -114,7 +126,10 @@ object DeviceFeatures {
             HealthCommands.COMMAND_TYPE -> {
                 HealthSettingsService.handleCommand(cmd)
                 WorkoutGpsController.handleCommand(cmd)
+                RealtimeStatsService.handleCommand(cmd)
             }
+            // Screen-on-for-notifications only; the rest of type 7 is NotificationForwarder's (BandEventRouter).
+            NotificationCmd.TYPE -> SystemExtrasService.handleNotificationCommand(cmd)
             ScheduleCommands.COMMAND_TYPE -> ScheduleService.handleCommand(cmd)
             WeatherCommands.COMMAND_TYPE -> WeatherService.handleCommand(cmd)
             WatchfaceCommands.COMMAND_TYPE -> WatchfaceService.handleCommand(cmd)

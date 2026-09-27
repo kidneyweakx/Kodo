@@ -21,6 +21,7 @@
 package com.kidneyweakx.miband9active
 
 import android.bluetooth.BluetoothManager
+import android.util.Log
 import com.kidneyweakx.miband9active.xiaomi.auth.XiaomiCrypto
 import com.kidneyweakx.miband9active.xiaomi.protocol.BandLinkException
 import com.kidneyweakx.miband9active.xiaomi.protocol.MiBand9BleDriver
@@ -59,6 +60,8 @@ object DriverHolder {
         } catch (e: IllegalArgumentException) {
             throw BandLinkException(BandLinkException.GATT, "stored band address '${band.id}' is invalid", e)
         }
+        // An explicit connect overrides an earlier user disconnect.
+        BandStore.userDisconnected = false
         try {
             d.connectAndAwait(device, key, timeoutMs, keepReconnecting = true)
         } catch (e: BandLinkException) {
@@ -68,4 +71,40 @@ object DriverHolder {
         }
         return d
     }
+
+    /**
+     * Arm the passive (autoConnect, no scan) reconnect to the stored band.
+     * Called on every process start (InitializerProvider — the process is
+     * started after boot / an OEM kill by the NotificationListenerService
+     * rebind or by WorkManager's own boot receiver) and as a safety net by the
+     * periodic worker. Cheap and idempotent. Returns true when armed.
+     *
+     * Skipped when no band is stored, the stored key is corrupt, or the user
+     * explicitly disconnected. If Bluetooth is off the target is still
+     * recorded so the driver's adapter receiver resumes on STATE_ON.
+     */
+    fun armReconnect(reason: String): Boolean {
+        val band = BandStore.load() ?: return false
+        if (BandStore.userDisconnected) {
+            Log.i(TAG, "not arming reconnect ($reason): user disconnected")
+            return false
+        }
+        val key = XiaomiCrypto.parseAuthKey(band.authKeyHex) ?: return false
+        val adapter = try {
+            AppContext.context.getSystemService(BluetoothManager::class.java)?.adapter
+        } catch (_: Throwable) {
+            null
+        } ?: return false
+        val device = try {
+            adapter.getRemoteDevice(band.id)
+        } catch (_: IllegalArgumentException) {
+            return false
+        }
+        val d = driver
+        if (d.isConnected()) return true
+        d.armPassiveReconnect(device, key, reason)
+        return true
+    }
+
+    private const val TAG = "MB9A_DriverHolder"
 }

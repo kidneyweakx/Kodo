@@ -56,6 +56,57 @@ export type BandLinkErrorCode =
   | 'GATT'
   | 'NOT_PAIRED';
 
+/** One link / power event (MB9A_POWER). `kind` is a stable machine string, e.g. 'connected'. */
+export interface LinkEvent {
+  /** ISO-8601 timestamp. */
+  readonly at: string;
+  /**
+   * process_start | worker | connected | disconnected | connect_failed |
+   * reconnect_armed | reconnect_stopped | bluetooth | sync | scan |
+   * realtime_hr | gps
+   */
+  readonly kind: string;
+  readonly detail: string;
+}
+
+/**
+ * Keep-alive / power diagnostics for the "Connection & power" screen. Every
+ * value is read from the real source (adapter, bond table, driver, WorkManager,
+ * persisted MB9A_POWER ring); `null` = never happened / unknown.
+ */
+export interface LinkDiagnostics {
+  readonly bluetoothEnabled: boolean;
+  /** System bond exists for the paired band. */
+  readonly bonded: boolean;
+  /** Passive autoConnect reconnect is armed (re-arms on drop, resumes on BT on). */
+  readonly reconnectArmed: boolean;
+  /** connectGatt attempts (active + passive) since the last successful connect. */
+  readonly reconnectAttempts: number;
+  readonly lastConnectedAt: string | null;
+  readonly lastDisconnectedAt: string | null;
+  readonly lastDisconnectReason: string | null;
+  /** Real WorkManager state: a non-finished periodic job exists. */
+  readonly periodicSyncEnabled: boolean;
+  readonly periodicSyncIntervalMinutes: number;
+  /** WorkInfo.nextScheduleTimeMillis of the pending run, else null. */
+  readonly nextPeriodicSyncAt: string | null;
+  /** Last successful band sync (user-started or background). */
+  readonly lastSyncAt: string | null;
+  /** Error of the most recent failed sync attempt, cleared by the next success. */
+  readonly lastSyncError: string | null;
+  /** Our NotificationListenerService is bound — the process keep-alive anchor. */
+  readonly notificationListenerConnected: boolean;
+  readonly ignoringBatteryOptimizations: boolean;
+  /** MB9A_POWER wake-ups in the last 24 h (persisted ring, survives process death). */
+  readonly wakeupsLast24h: number;
+  /** Last <= 50 link/power events, newest first, persisted. */
+  readonly events: readonly LinkEvent[];
+  /** Addition: the user explicitly disconnected; nothing reconnects until connect(). */
+  readonly userDisconnected: boolean;
+  /** Addition: realtime heart-rate streaming is currently on. */
+  readonly realtimeHeartRateActive: boolean;
+}
+
 export interface HybridBandLink
   extends HybridObject<{ android: 'kotlin' }> {
   // ----- state -----
@@ -83,7 +134,11 @@ export interface HybridBandLink
    * Rejects with `NOT_PAIRED:` when no band is stored, else same codes as pair().
    */
   connect(): Promise<void>;
-  /** User-initiated disconnect. Also disarms passive auto-reconnect. */
+  /**
+   * User-initiated disconnect. Disarms passive auto-reconnect (persisted: a
+   * process restart does not re-arm it, the periodic worker skips) until the
+   * next `connect()` / `pair()`.
+   */
   disconnect(): void;
 
   // ----- background + band housekeeping -----
@@ -91,6 +146,24 @@ export interface HybridBandLink
   setPeriodicSync(enabled: boolean, intervalMinutes: number): void;
   /** Ask the band for a fresh battery reading (no-op when not connected). */
   requestBattery(): void;
+
+  // ----- diagnostics (docs/POWER.md "Auditing") -----
+  /** Synchronous and cheap (WorkManager state cached 30 s). */
+  getDiagnostics(): LinkDiagnostics;
+  /** Clears the persisted event ring and the wake-up counter. */
+  clearDiagnostics(): void;
+
+  // ----- realtime heart rate (opt-in, docs/POWER.md rule 6) -----
+  /**
+   * Ask the band to stream realtime stats (XiaomiHealthService 8/45). No-op
+   * when not connected. Stops by itself when the last onRealtimeHeartRate
+   * listener unsubscribes, on disconnect, and after 5 minutes (calling start
+   * again restarts the 5-minute cap).
+   */
+  startRealtimeHeartRate(): void;
+  stopRealtimeHeartRate(): void;
+  /** bpm per band event (~1 Hz). Readings of 0 (no contact / warming up) are not delivered. */
+  onRealtimeHeartRate(listener: (bpm: number) => void): () => void;
 
   // ----- sync -----
   /**

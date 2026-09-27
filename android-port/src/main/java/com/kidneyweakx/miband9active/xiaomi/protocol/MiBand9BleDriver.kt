@@ -31,6 +31,19 @@
  *  (the controller-side background connection Gadgetbridge also relies on via
  *  BluetoothGatt.connect(), BtLEQueue.handleDisconnected) while the process
  *  lives. docs/POWER.md.
+ *
+ *  Keep-alive contract (docs/POWER.md rule 1):
+ *   - [armPassiveReconnect] is called at process start (DriverHolder.
+ *     armReconnect) so a cold start after reboot / OEM kill / NLS rebind
+ *     reconnects without the UI. No scan, no wake lock.
+ *   - Healthy drop (status 0 / 8 supervision timeout / 19 / 22): re-arm
+ *     autoConnect immediately — it only adds the band to the controller's
+ *     background-connect list, and a Handler delay would not run while the
+ *     CPU is suspended. Stack errors (129/133/147/...) wait 5 s, then back
+ *     off 5 s → 10 min on repeated failures.
+ *   - Stops on AUTH_REJECTED (wrong key), PERMISSION, missing V2 service,
+ *     user disconnect/forget; paused while Bluetooth is off, resumed on ON.
+ *   - Every transition goes through [PowerLog] (MB9A_POWER).
  */
 package com.kidneyweakx.miband9active.xiaomi.protocol
 
@@ -75,7 +88,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto
 
 private const val TAG = "MiBand9BleDriver"
-private const val POWER_TAG = "MB9A_POWER"
 
 class MiBand9BleDriver(context: Context) {
 
@@ -164,6 +176,39 @@ class MiBand9BleDriver(context: Context) {
 
     fun isConnected(): Boolean = sessionReady && _state.value is State.Connected
 
+    /** Passive reconnect is armed (or will re-arm on the next drop / BT on). */
+    val reconnectArmed: Boolean get() = autoReconnect && targetDevice != null
+
+    /**
+     * Arm the passive `autoConnect = true` reconnect to a stored, known-good
+     * band without an active connect (process start after reboot / OEM kill).
+     * No-op when already connected, connecting, or armed to the same target.
+     */
+    fun armPassiveReconnect(device: BluetoothDevice, authKey16: ByteArray, reason: String) {
+        require(authKey16.size == 16) { "auth key must be 16 bytes" }
+        synchronized(attemptLock) {
+            val same = sameTarget(device, authKey16)
+            if (!same) {
+                val cur = attempt
+                if (cur != null && !cur.isCompleted) return // an explicit connect/pair is running; don't fight it
+                passiveFailures = 0
+            }
+            targetDevice = device
+            targetKey = authKey16.copyOf()
+            autoReconnect = true
+        }
+        gattHandler.post {
+            if (isConnected() || gatt != null || attempt?.isCompleted == false) return@post
+            if (!isAdapterEnabled()) {
+                PowerLog.event(PowerLog.RECONNECT_ARMED, "$reason — waiting for Bluetooth to turn on")
+                return@post
+            }
+            gattHandler.removeCallbacksAndMessages(RECONNECT_TOKEN)
+            openGatt(device, autoConnect = true, reason = reason)
+            if (gatt != null) _state.value = State.Disconnected
+        }
+    }
+
     /** Address of the band the driver is (or was last) targeting. */
     val targetAddress: String? get() = targetDevice?.address
 
@@ -217,7 +262,9 @@ class MiBand9BleDriver(context: Context) {
     /** User-initiated disconnect. Disarms passive auto-reconnect. */
     fun disconnect() {
         Log.i(TAG, "disconnect() requested by user")
+        val wasArmed = autoReconnect
         autoReconnect = false
+        if (wasArmed || isConnected()) PowerLog.onDisconnected("user disconnect — reconnect off", wakeup = false)
         val a = takeAttempt()
         a?.completeExceptionally(BandLinkException(BandLinkException.GATT, "disconnect requested"))
         gattHandler.post {
@@ -237,6 +284,7 @@ class MiBand9BleDriver(context: Context) {
         targetKey = null
         _battery.value = null
         _deviceInfo.value = null
+        knownCharging = null
     }
 
     /** Send a Command frame on the encrypted PROTOBUF channel. Dropped (logged) if not authenticated. */
@@ -320,6 +368,7 @@ class MiBand9BleDriver(context: Context) {
         }
         if (!mine) return
         d.completeExceptionally(ex)
+        PowerLog.event(PowerLog.CONNECT_FAILED, ex.message ?: ex.code)
         gattHandler.post {
             closeGatt("attempt failed: ${ex.message}")
             _state.value = State.Error(ex.message ?: ex.code)
@@ -330,14 +379,20 @@ class MiBand9BleDriver(context: Context) {
     // ============================================================ GATT lifecycle (gattHandler thread)
 
     @SuppressLint("MissingPermission")
-    private fun openGatt(device: BluetoothDevice, autoConnect: Boolean) {
+    private fun openGatt(device: BluetoothDevice, autoConnect: Boolean, reason: String = "") {
         closeGatt("reopen")
         passive = autoConnect
         servicesRequested = false
         linkUp = false
         resetLinkState()
         Log.i(TAG, "openGatt(${device.address}, autoConnect=$autoConnect)")
-        if (autoConnect) Log.i(POWER_TAG, "arming passive autoConnect reconnect to ${device.address}")
+        PowerLog.onConnectAttempt()
+        if (autoConnect) {
+            PowerLog.event(
+                PowerLog.RECONNECT_ARMED,
+                "passive autoConnect to ${device.address}" + if (reason.isNotEmpty()) " ($reason)" else "",
+            )
+        }
         val g = try {
             device.connectGatt(
                 appContext,
@@ -398,6 +453,7 @@ class MiBand9BleDriver(context: Context) {
         closeGatt("failLink")
         if (ex.code == BandLinkException.AUTH_REJECTED) autoReconnect = false
         val a = takeAttempt()
+        if (a == null) PowerLog.event(PowerLog.CONNECT_FAILED, ex.message ?: ex.code)
         _state.value = State.Error(ex.message ?: ex.code)
         a?.completeExceptionally(ex)
         maybeSchedulePassive(ex)
@@ -405,7 +461,11 @@ class MiBand9BleDriver(context: Context) {
 
     private fun maybeSchedulePassive(ex: BandLinkException?) {
         if (!autoReconnect) return
-        if (ex != null && (ex.code == BandLinkException.AUTH_REJECTED || ex.code == BandLinkException.PERMISSION)) return
+        if (ex != null && (ex.code == BandLinkException.AUTH_REJECTED || ex.code == BandLinkException.PERMISSION)) {
+            if (ex.code == BandLinkException.PERMISSION) autoReconnect = false
+            PowerLog.event(PowerLog.RECONNECT_STOPPED, ex.message ?: ex.code)
+            return
+        }
         passiveFailures++
         val delayMs = (PASSIVE_BASE_DELAY_MS shl (passiveFailures - 1).coerceAtMost(7)).coerceAtMost(PASSIVE_MAX_DELAY_MS)
         schedulePassive(delayMs)
@@ -417,7 +477,7 @@ class MiBand9BleDriver(context: Context) {
         Log.i(TAG, "scheduling passive reconnect in ${delayMs}ms")
         postDelayed(RECONNECT_TOKEN, delayMs) {
             if (autoReconnect && gatt == null && attempt?.isCompleted != false && isAdapterEnabled()) {
-                openGatt(device, autoConnect = true)
+                openGatt(device, autoConnect = true, reason = "backoff ${delayMs}ms")
                 if (gatt != null) _state.value = State.Disconnected
             }
         }
@@ -451,15 +511,20 @@ class MiBand9BleDriver(context: Context) {
         }
         Log.i(TAG, "link lost (status=$status wasReady=$wasReady passive=$wasPassive)")
         _state.value = State.Disconnected
+        if (wasReady) PowerLog.onDisconnected("link lost (status=$status)", wakeup = true)
         if (autoReconnect) {
             if (wasReady) {
                 passiveFailures = 0
                 // BtLEQueue.handleDisconnected: healthy drop → immediate re-connect;
-                // stack errors → give the stack time to settle.
-                schedulePassive(if (status in UNHEALTHY_STATUSES) 5_000L else 1_000L)
+                // stack errors → give the stack time to settle. Immediate = posted
+                // now, while the binder callback still keeps the CPU awake.
+                schedulePassive(if (status in UNHEALTHY_STATUSES) 5_000L else 0L)
             } else {
+                if (wasLinkUp) PowerLog.event(PowerLog.CONNECT_FAILED, "link dropped before auth (status=$status)")
                 maybeSchedulePassive(null)
             }
+        } else if (wasReady) {
+            PowerLog.event(PowerLog.RECONNECT_STOPPED, "auto-reconnect disarmed")
         }
     }
 
@@ -683,9 +748,13 @@ class MiBand9BleDriver(context: Context) {
         val sys = cmd.system
         when (cmd.subtype) {
             SystemCommands.CMD_BATTERY -> if (sys.hasPower() && sys.power.hasBattery()) {
+                // XiaomiSystemService.handleBattery: the battery's own state wins,
+                // else the charger state cached from the last DeviceState.
                 val b = sys.power.battery
                 val prev = _battery.value
-                val charging = if (b.hasState()) chargingFromRaw(b.state) ?: prev?.charging ?: false else prev?.charging ?: false
+                val fromBattery = if (b.hasState()) chargingFromRaw(b.state) else null
+                val charging = fromBattery ?: knownCharging ?: prev?.charging ?: false
+                knownCharging = charging
                 _battery.value = BatteryReading(b.level, charging, System.currentTimeMillis())
                 Log.i(TAG, "battery ${b.level}% charging=$charging")
             }
@@ -694,15 +763,23 @@ class MiBand9BleDriver(context: Context) {
                 Log.i(TAG, "device info fw=${sys.deviceInfo.firmware} model=${sys.deviceInfo.model}")
             }
             SystemCommands.CMD_DEVICE_STATE_GET -> if (sys.hasBasicDeviceState()) {
+                // XiaomiSystemService.handleBasicDeviceState
                 val s = sys.basicDeviceState
-                val prev = _battery.value
-                val level = if (s.hasBatteryLevel()) s.batteryLevel else prev?.level
-                if (level != null) _battery.value = BatteryReading(level, s.isCharging, System.currentTimeMillis())
+                knownCharging = s.isCharging
+                if (s.hasBatteryLevel()) {
+                    _battery.value = BatteryReading(s.batteryLevel, s.isCharging, System.currentTimeMillis())
+                } else {
+                    requestBatteryNow()
+                }
             }
-            SystemCommands.CMD_DEVICE_STATE -> if (sys.hasDeviceState() && sys.deviceState.hasChargingState()) {
-                val prev = _battery.value
-                val charging = chargingFromRaw(sys.deviceState.chargingState)
-                if (prev != null && charging != null) _battery.value = prev.copy(charging = charging, atMillis = System.currentTimeMillis())
+            SystemCommands.CMD_DEVICE_STATE -> {
+                // XiaomiSystemService.handleDeviceState: band pushes this on charger
+                // plug/unplug (and wear/sleep changes); cache the charger state, then
+                // ask for the battery so level + state arrive together.
+                if (sys.hasDeviceState() && sys.deviceState.hasChargingState()) {
+                    chargingFromRaw(sys.deviceState.chargingState)?.let { knownCharging = it }
+                }
+                requestBatteryNow()
             }
         }
     }
@@ -812,7 +889,7 @@ class MiBand9BleDriver(context: Context) {
         autoReconnect = true
         _state.value = State.Connected
         takeAttempt()?.complete(Unit)
-        Log.i(POWER_TAG, "band session established")
+        PowerLog.onConnected("band session established (${targetDevice?.address})")
         scope.launch { runPostAuthInit() }
     }
 
@@ -831,6 +908,18 @@ class MiBand9BleDriver(context: Context) {
         } catch (t: Throwable) {
             Log.w(TAG, "post-auth init failed", t)
         }
+    }
+
+    /** Charger state from the last DeviceState / BasicDeviceState, applied to the next battery reading. */
+    @Volatile private var knownCharging: Boolean? = null
+
+    /** Non-suspending battery request usable from the GATT thread. Dropped when not authenticated. */
+    private fun requestBatteryNow() {
+        val cmd = XiaomiProto.Command.newBuilder()
+            .setType(SystemCommands.COMMAND_TYPE)
+            .setSubtype(SystemCommands.CMD_BATTERY)
+            .build()
+        enqueueData(cmd.toByteArray(), XiaomiChannel.PROTOBUF, encrypt = true, requireSession = true)
     }
 
     private fun regionCode(): String {
@@ -966,14 +1055,22 @@ class MiBand9BleDriver(context: Context) {
             override fun onReceive(c: Context, intent: Intent) {
                 when (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1)) {
                     BluetoothAdapter.STATE_TURNING_OFF, BluetoothAdapter.STATE_OFF -> gattHandler.post {
+                        val hadLink = gatt != null || isConnected()
                         val a = takeAttempt()
                         closeGatt("Bluetooth turned off")
                         gattHandler.removeCallbacksAndMessages(RECONNECT_TOKEN)
                         _state.value = State.Disconnected
                         a?.completeExceptionally(BandLinkException(BandLinkException.BT_OFF, "Bluetooth was turned off"))
+                        if (hadLink) PowerLog.onDisconnected("Bluetooth turned off", wakeup = true)
+                        else PowerLog.event(PowerLog.BLUETOOTH, "off")
                     }
                     BluetoothAdapter.STATE_ON -> gattHandler.post {
-                        if (autoReconnect && gatt == null) schedulePassive(1_000L)
+                        PowerLog.event(PowerLog.BLUETOOTH, "on" + if (autoReconnect) " — resuming passive reconnect" else "")
+                        if (autoReconnect && gatt == null) {
+                            passiveFailures = 0
+                            // The stack needs a moment after STATE_ON before connectGatt is reliable.
+                            schedulePassive(1_000L)
+                        }
                     }
                 }
             }
@@ -1010,8 +1107,13 @@ class MiBand9BleDriver(context: Context) {
 
         /** 133 GATT_ERROR, 147 GATT_CONNECTION_TIMEOUT, 8 CONN_TIMEOUT, 62 CONN_FAILED_ESTABLISHMENT. */
         private val TRANSIENT_STATUSES = setOf(0x85, 0x93, 0x08, 0x3E)
-        /** BtLEQueue.handleDisconnected "unhealthy" statuses. */
-        private val UNHEALTHY_STATUSES = setOf(0x81, 0x85, 0x08, 0x05, 0x0F, 0x93)
+        /**
+         * BtLEQueue.handleDisconnected "unhealthy" statuses (stack / bonding
+         * errors). 0x08 is deliberately NOT here: on a disconnect it is HCI
+         * CONNECTION_TIMEOUT (link supervision timeout = band walked out of
+         * range), after which re-arming autoConnect right away is correct.
+         */
+        private val UNHEALTHY_STATUSES = setOf(0x81, 0x85, 0x05, 0x0F, 0x93)
 
         /** AbstractBTLEDeviceSupport.calcMaxWriteChunk. */
         fun calcMaxWriteChunk(mtu: Int): Int = minOf(512, maxOf(23, mtu) - 3)
